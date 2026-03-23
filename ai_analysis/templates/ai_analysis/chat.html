@@ -1,116 +1,229 @@
 {% extends "ai_analysis/base.html" %}
 
 {% block title %}AI Chat{% endblock %}
+{% block main_class %}mx-auto w-full max-w-none px-0 pb-0 pt-0{% endblock %}
 
 {% block content %}
-<div class="grid gap-4 lg:grid-cols-[320px_1fr]">
-  <aside class="flex min-h-[78vh] flex-col rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-soft backdrop-blur">
-    <button id="new-chat-btn" type="button" class="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
-      + New Chat
-    </button>
+<style>
+  @keyframes fadeSlideIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .msg-animate { animation: fadeSlideIn 0.3s ease-out; }
 
-    <div id="chat-session-list" class="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
+  @keyframes dotPulse {
+    0%, 80%, 100% { opacity: 0.25; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+  .dot-1 { animation: dotPulse 1.4s infinite ease-in-out; }
+  .dot-2 { animation: dotPulse 1.4s infinite ease-in-out 0.2s; }
+  .dot-3 { animation: dotPulse 1.4s infinite ease-in-out 0.4s; }
+
+  .markdown-body p { margin: 0.4rem 0; }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3 { margin: 0.6rem 0; font-weight: 700; }
+  .markdown-body ul, .markdown-body ol { margin: 0.4rem 0; padding-left: 1.25rem; }
+  .markdown-body li { margin: 0.15rem 0; }
+  .markdown-body code { background: rgba(28, 25, 23, 0.06); border-radius: 0.3rem; padding: 0.15rem 0.35rem; font-size: 0.85em; }
+  .markdown-body pre { background: #1c1917; color: #e7e5e4; border-radius: 0.75rem; padding: 1rem; overflow-x: auto; margin: 0.5rem 0; }
+  .markdown-body pre code { background: transparent; padding: 0; font-size: 0.9em; }
+  .markdown-body table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; font-size: 0.9em; }
+  .markdown-body th, .markdown-body td { border: 1px solid #e7e5e4; padding: 0.4rem 0.6rem; text-align: left; }
+  .markdown-body th { background: #f5f5f4; font-weight: 600; }
+  .markdown-body blockquote { border-left: 3px solid #d6d3d1; padding-left: 1rem; margin: 0.5rem 0; color: #78716c; }
+</style>
+
+<div id="chat-shell" class="flex h-[calc(100dvh-76px)] min-h-[640px] bg-white/95 backdrop-blur-sm">
+  {# ══════════════════ SIDEBAR ══════════════════ #}
+  <aside id="chat-sidebar" class="relative flex w-[300px] flex-shrink-0 flex-col border-r border-slate-200 bg-slate-950 text-slate-100 transition-all duration-300 overflow-hidden" style="min-width: 300px;">
+    {# Sidebar header #}
+    <div class="flex items-center justify-between border-b border-white/10 px-3 pt-3 pb-2">
+      <button id="sidebar-collapse" type="button" class="rounded-lg p-2 text-stone-400 hover:bg-white/10 hover:text-white" title="Close sidebar">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+      </button>
+      <button id="new-chat-btn" type="button" class="rounded-lg p-2 text-stone-400 hover:bg-white/10 hover:text-white" title="New chat">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
+      </button>
+    </div>
+
+    {# Session list #}
+    <div id="chat-session-list" class="mt-1 flex-1 space-y-0.5 overflow-y-auto px-2 py-2 scrollbar-thin">
       {% for session in chat_sessions %}
         <a
           href="/chat?session={{ session.id }}"
-          class="block rounded-xl border px-3 py-2 text-sm transition {% if selected_session_id == session.id %}border-slate-900 bg-slate-900 text-white{% else %}border-slate-200 bg-white text-slate-800 hover:bg-slate-50{% endif %}"
+          class="group block rounded-xl px-3 py-2.5 text-sm transition-all {% if selected_session_id == session.id %}bg-white/15 text-white{% else %}text-slate-400 hover:bg-white/10 hover:text-slate-200{% endif %}"
           data-session-id="{{ session.id }}"
         >
           <p class="truncate font-medium">{{ session.title }}</p>
-          <p class="mt-1 truncate text-xs {% if selected_session_id == session.id %}text-slate-200{% else %}text-slate-500{% endif %}">
+          <p class="mt-0.5 truncate text-xs {% if selected_session_id == session.id %}text-slate-400{% else %}text-slate-500 group-hover:text-slate-400{% endif %}">
             {% if session.last_message %}{{ session.last_message }}{% else %}No messages yet{% endif %}
           </p>
         </a>
       {% empty %}
-        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
-          No chats yet. Start a new chat.
+        <div class="rounded-xl border border-transparent px-3 py-4 text-sm text-slate-500 text-center">
+          No chats yet
         </div>
       {% endfor %}
     </div>
 
-    <div class="mt-4 space-y-2 text-sm">
-      <a href="/upload" class="block rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Upload New File</a>
-      <a href="/visualization" class="block rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Open Visualization</a>
+    {# Bottom navigation #}
+    <div class="border-t border-white/10 px-2 py-2 space-y-0.5">
+      <a href="/upload" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-400 hover:bg-white/10 hover:text-slate-200">
+        <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+        Upload Data
+      </a>
+      <a href="/visualization" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-400 hover:bg-white/10 hover:text-slate-200">
+        <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+        Visualization
+      </a>
+      <a href="/settings" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-slate-400 hover:bg-white/10 hover:text-slate-200">
+        <svg class="h-4 w-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 .255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        Settings
+      </a>
     </div>
   </aside>
 
-  <section class="relative min-h-[78vh] rounded-2xl border border-slate-200 bg-white/85 shadow-soft backdrop-blur">
-    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-      <h2 class="text-sm font-semibold text-slate-900">Chat</h2>
-      {% if active_upload %}
-        <span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-          {{ active_upload.original_filename }}
-        </span>
-      {% else %}
-        <span class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
-          No active dataset
-        </span>
-      {% endif %}
+  {# ══════════════════ MAIN CHAT AREA ══════════════════ #}
+  <section class="relative flex flex-1 flex-col bg-white/90 min-w-0">
+    {# Chat top bar #}
+    <div class="flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3">
+      <button id="sidebar-open" type="button" class="hidden rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600" title="Open sidebar">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
+      </button>
+      <h2 class="text-sm font-medium text-slate-600">
+        {% if active_upload %}
+          <span class="inline-flex items-center gap-1.5">
+            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+            {{ active_upload.original_filename }}
+          </span>
+        {% else %}
+          <span class="inline-flex items-center gap-1.5">
+            <span class="h-2 w-2 rounded-full bg-slate-300"></span>
+            No active dataset
+          </span>
+        {% endif %}
+      </h2>
     </div>
-    <div id="chat-log" class="h-[65vh] space-y-6 overflow-y-auto px-5 py-6">
+
+    {# ── Messages ── #}
+    <div id="chat-log" class="flex-1 overflow-y-auto bg-gradient-to-b from-slate-50/50 to-white">
       {% for message in messages %}
-        <article data-role="{{ message.role }}" class="flex {% if message.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
-          <div class="max-w-[85%] rounded-2xl px-4 py-3 {% if message.role == 'user' %}bg-slate-900 text-white{% else %}border border-slate-200 bg-slate-50 text-slate-900{% endif %}">
-            <div class="mb-1 flex items-center justify-between gap-3 text-[11px] uppercase tracking-wide {% if message.role == 'user' %}text-slate-200{% else %}text-slate-500{% endif %}">
-              <span>{{ message.role }}</span>
+        <article data-role="{{ message.role }}" class="msg-animate border-b border-slate-100 px-4 py-6 {% if message.role == 'user' %}bg-white{% else %}bg-slate-50/70{% endif %}">
+          <div class="mx-auto flex max-w-3xl gap-4">
+            <div class="flex-shrink-0 pt-0.5">
+              {% if message.role == 'user' %}
+                <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-slate-700 to-slate-900 text-xs font-bold text-white shadow-sm">Y</span>
+              {% else %}
+                <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-600 text-[10px] font-bold text-white shadow-sm">AI</span>
+              {% endif %}
             </div>
-            <div class="bubble-content whitespace-pre-wrap text-sm leading-6">{{ message.content }}</div>
-            <div class="bubble-attachments mt-3 space-y-2"></div>
+            <div class="flex-1 min-w-0">
+              <div class="mb-1.5 text-[13px] font-semibold {% if message.role == 'user' %}text-slate-900{% else %}text-slate-700{% endif %}">
+                {% if message.role == 'user' %}You{% else %}Assistant{% endif %}
+              </div>
+              <div class="bubble-content whitespace-pre-wrap text-[15px] leading-7 text-slate-700">{{ message.content }}</div>
+              <div class="bubble-attachments mt-4 space-y-3"></div>
+            </div>
           </div>
         </article>
       {% empty %}
-        <p class="text-sm text-slate-500">No messages yet. Ask a question to start.</p>
+        <p class="flex h-full flex-col items-center justify-center text-center text-sm text-slate-500 px-4">
+          <span class="mb-2 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-stone-100 to-stone-200/80 shadow-sm">
+            <svg class="h-8 w-8 text-stone-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+          </span>
+          <span class="mt-5 text-2xl font-semibold text-stone-800">What would you like to analyze?</span>
+          <span class="mt-2 max-w-lg text-[15px] leading-relaxed text-stone-500">Upload a dataset and ask me anything — SQL queries, visualizations, statistical analysis, and more.</span>
+          <span class="mt-8 grid max-w-2xl grid-cols-2 gap-3 text-left">
+            <span class="cursor-pointer rounded-2xl border border-stone-200 bg-white px-4 py-3.5 text-sm text-stone-600 shadow-sm hover:border-stone-300 hover:shadow-md" onclick="document.getElementById('chat-input').value=this.querySelector('.chip-text').textContent;document.getElementById('chat-input').focus()">
+              <span class="mb-1 block text-base">&#128202;</span>
+              <span class="chip-text">Summarize this dataset</span>
+            </span>
+            <span class="cursor-pointer rounded-2xl border border-stone-200 bg-white px-4 py-3.5 text-sm text-stone-600 shadow-sm hover:border-stone-300 hover:shadow-md" onclick="document.getElementById('chat-input').value=this.querySelector('.chip-text').textContent;document.getElementById('chat-input').focus()">
+              <span class="mb-1 block text-base">&#128200;</span>
+              <span class="chip-text">Show trends over time</span>
+            </span>
+            <span class="cursor-pointer rounded-2xl border border-stone-200 bg-white px-4 py-3.5 text-sm text-stone-600 shadow-sm hover:border-stone-300 hover:shadow-md" onclick="document.getElementById('chat-input').value=this.querySelector('.chip-text').textContent;document.getElementById('chat-input').focus()">
+              <span class="mb-1 block text-base">&#128269;</span>
+              <span class="chip-text">Find outliers and anomalies</span>
+            </span>
+            <span class="cursor-pointer rounded-2xl border border-stone-200 bg-white px-4 py-3.5 text-sm text-stone-600 shadow-sm hover:border-stone-300 hover:shadow-md" onclick="document.getElementById('chat-input').value=this.querySelector('.chip-text').textContent;document.getElementById('chat-input').focus()">
+              <span class="mb-1 block text-base">&#128201;</span>
+              <span class="chip-text">Compare categories</span>
+            </span>
+          </span>
+        </p>
       {% endfor %}
     </div>
 
-    <div class="border-t border-slate-200 bg-white/90 p-4">
-      <form id="chat-form" class="mx-auto flex max-w-4xl items-end gap-3">
+    {# ── Input area ── #}
+    <div class="border-t border-slate-200 bg-white/95 px-4 pb-6 pt-4">
+      <form id="chat-form" class="mx-auto max-w-3xl">
         {% csrf_token %}
-        <textarea id="chat-input" rows="1" class="max-h-52 min-h-[52px] w-full resize-y rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 focus:border-brand-500 focus:outline-none" placeholder="Message AI Analysis..."></textarea>
-        <button id="send-button" type="submit" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">
-          Send
-        </button>
+        <div class="rounded-2xl border border-slate-200 bg-surface-100 shadow-input transition-all focus-within:border-brand-300 focus-within:shadow-elevated">
+          <textarea
+            id="chat-input"
+            rows="1"
+            class="block max-h-52 min-h-[52px] w-full resize-none rounded-t-2xl border-0 bg-transparent px-4 pt-3.5 pb-2 text-[15px] leading-6 text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-0"
+            placeholder="Message Excel Analysis..."
+            oninput="this.style.height='auto';this.style.height=Math.min(this.scrollHeight,208)+'px'"
+          ></textarea>
+          <div class="flex items-center justify-between px-3 pb-2.5">
+            <span class="text-[11px] text-slate-400 pl-1">SQL, pandas, matplotlib, or natural language</span>
+            <button id="send-button" type="submit" class="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-slate-900">
+              <svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.905H13.5a.75.75 0 010 1.5H4.984l-2.432 7.905a.75.75 0 00.926.94 60.519 60.519 0 0018.445-8.986.75.75 0 000-1.218A60.517 60.517 0 003.478 2.405z"/></svg>
+            </button>
+          </div>
+        </div>
       </form>
-      <p class="mx-auto mt-2 max-w-4xl text-xs text-slate-500">Use SQL-style questions, pandas-style analysis requests, or ask for plots with matplotlib.</p>
     </div>
   </section>
 </div>
 
-<div id="trace-panel" class="fixed right-0 top-0 z-50 h-full w-full max-w-lg translate-x-full border-l border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur transition-transform duration-300">
-  <div class="mb-3 flex items-center justify-between">
+{# ══════════════════ TRACE PANEL ══════════════════ #}
+<div id="trace-panel" class="fixed right-0 top-0 z-50 flex h-full w-full max-w-md translate-x-full flex-col border-l border-slate-200/60 bg-white shadow-2xl transition-transform duration-300">
+  <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3">
     <div>
-      <h3 class="text-sm font-semibold text-slate-900">Tool Trace</h3>
-      <p class="text-xs text-slate-500">Live action/input/observation stream</p>
+      <h3 class="text-sm font-semibold text-slate-800">Tool Trace</h3>
+      <p class="text-xs text-slate-400">Live agent execution stream</p>
     </div>
-    <button id="close-trace" type="button" class="rounded-lg border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Close</button>
+    <button id="close-trace" type="button" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600">
+      <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+    </button>
   </div>
-  <div id="trace-log" class="h-[90%] space-y-3 overflow-y-auto pr-1"></div>
+  <div id="trace-log" class="flex-1 space-y-3 overflow-y-auto bg-slate-50/60 p-4"></div>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
-<style>
-  .markdown-body p { margin: 0.35rem 0; }
-  .markdown-body h1, .markdown-body h2, .markdown-body h3 { margin: 0.5rem 0; font-weight: 700; }
-  .markdown-body ul, .markdown-body ol { margin: 0.35rem 0; padding-left: 1.2rem; }
-  .markdown-body code { background: rgba(15, 23, 42, 0.08); border-radius: 0.25rem; padding: 0.1rem 0.28rem; }
-  .markdown-body pre { background: #0f172a; color: #f8fafc; border-radius: 0.6rem; padding: 0.7rem; overflow-x: auto; }
-  .markdown-body pre code { background: transparent; padding: 0; }
-  .markdown-body table { width: 100%; border-collapse: collapse; margin: 0.4rem 0; }
-  .markdown-body th, .markdown-body td { border: 1px solid #e2e8f0; padding: 0.35rem 0.45rem; text-align: left; }
-</style>
 <script>
+  // ── Sidebar toggle ──
+  const chatSidebar = document.getElementById("chat-sidebar");
+  const sidebarCollapseBtn = document.getElementById("sidebar-collapse");
+  const sidebarOpenBtn = document.getElementById("sidebar-open");
+  const SIDEBAR_WIDTH = 300;
+
+  function toggleSidebar() {
+    const isOpen = chatSidebar.style.minWidth !== "0px";
+    chatSidebar.style.width = isOpen ? "0px" : `${SIDEBAR_WIDTH}px`;
+    chatSidebar.style.minWidth = isOpen ? "0px" : `${SIDEBAR_WIDTH}px`;
+    sidebarOpenBtn.classList.toggle("hidden", !isOpen);
+  }
+  sidebarCollapseBtn?.addEventListener("click", toggleSidebar);
+  sidebarOpenBtn?.addEventListener("click", toggleSidebar);
+
+  // ── Chat core ──
   const chatForm = document.getElementById("chat-form");
   const chatInput = document.getElementById("chat-input");
   const chatLog = document.getElementById("chat-log");
+  const chatShell = document.getElementById("chat-shell");
   const sendButton = document.getElementById("send-button");
   const tracePanel = document.getElementById("trace-panel");
   const traceLog = document.getElementById("trace-log");
   const closeTraceBtn = document.getElementById("close-trace");
   const newChatBtn = document.getElementById("new-chat-btn");
   const chatSessionList = document.getElementById("chat-session-list");
+  const appHeader = document.querySelector("body > header");
 
   let currentAssistantEl = null;
   let currentAssistantAttachmentsEl = null;
@@ -120,6 +233,22 @@
   let currentSessionId = {{ selected_session_id|default_if_none:"null" }};
   const traceStepMap = new Map();
   const currentPlotUrls = new Set();
+
+  function syncChatShellHeight() {
+    if (!chatShell) return;
+    const headerHeight = appHeader ? appHeader.offsetHeight : 0;
+    chatShell.style.height = `calc(100dvh - ${headerHeight}px)`;
+  }
+  syncChatShellHeight();
+  window.addEventListener("resize", syncChatShellHeight);
+
+  chatInput?.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    if (event.shiftKey || event.isComposing) return;
+    event.preventDefault();
+    if (sendButton.disabled) return;
+    chatForm.requestSubmit();
+  });
 
   function scrollToBottom(container) {
     container.scrollTop = container.scrollHeight;
@@ -141,7 +270,7 @@
   }
 
   function updateTraceToggleButtons() {
-    const label = isTracePanelOpen() ? "hide tool execution" : "view tool execution";
+    const label = isTracePanelOpen() ? "hide tool trace" : "view tool trace";
     document.querySelectorAll('[data-open-trace="1"]').forEach((el) => {
       el.textContent = label;
     });
@@ -173,14 +302,25 @@
   function createBubble(role, text = "") {
     const container = document.createElement("article");
     container.dataset.role = role;
-    container.className = `flex ${role === "user" ? "justify-end" : "justify-start"}`;
+    container.className = `msg-animate border-b border-stone-50 px-4 py-6 ${role === "user" ? "bg-white" : "bg-stone-50/50"}`;
+
     const bubble = document.createElement("div");
-    bubble.className = `max-w-[85%] rounded-2xl px-4 py-3 ${role === "user" ? "bg-slate-900 text-white" : "border border-slate-200 bg-slate-50 text-slate-900"}`;
+    bubble.className = "mx-auto flex max-w-3xl gap-4";
+
+    const avatarBg = role === "user" ? "from-stone-700 to-stone-900" : "from-brand-400 to-brand-600";
+    const avatarLabel = role === "user" ? "Y" : "AI";
+    const displayName = role === "user" ? "You" : "Assistant";
+
     bubble.innerHTML = `
-      <div class="mb-1 text-[11px] uppercase tracking-wide ${role === "user" ? "text-slate-200" : "text-slate-500"}">${role}</div>
-      <div class="bubble-content whitespace-pre-wrap text-sm leading-6"></div>
-      <div class="assistant-status mt-2 hidden rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] text-brand-700"></div>
-      <div class="bubble-attachments mt-3 space-y-2"></div>
+      <div class="flex-shrink-0 pt-0.5">
+        <span class="inline-flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br ${avatarBg} text-${role === "user" ? "xs" : "[10px]"} font-bold text-white shadow-sm">${avatarLabel}</span>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="mb-1.5 text-[13px] font-semibold text-stone-800">${displayName}</div>
+        <div class="bubble-content whitespace-pre-wrap text-[15px] leading-7 text-stone-700"></div>
+        <div class="assistant-status mt-3 hidden rounded-xl border px-3 py-2 text-xs border-brand-200 bg-brand-50 text-brand-700"></div>
+        <div class="bubble-attachments mt-4 space-y-3"></div>
+      </div>
     `;
     bubble.querySelector(".bubble-content").textContent = text;
     container.appendChild(bubble);
@@ -212,11 +352,16 @@
 
   function setAssistantStatus(text, type = "running") {
     if (!currentAssistantStatusEl) return;
-    currentAssistantStatusEl.classList.remove("hidden", "border-brand-200", "bg-brand-50", "text-brand-700", "border-rose-200", "bg-rose-50", "text-rose-700", "border-emerald-200", "bg-emerald-50", "text-emerald-700");
-    if (type === "error") currentAssistantStatusEl.classList.add("border-rose-200", "bg-rose-50", "text-rose-700");
-    else if (type === "done") currentAssistantStatusEl.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
-    else currentAssistantStatusEl.classList.add("border-brand-200", "bg-brand-50", "text-brand-700");
-    currentAssistantStatusEl.innerHTML = `${escapeHtml(text)} <button type="button" class="ml-2 underline" data-open-trace="1">view tool execution</button>`;
+    currentAssistantStatusEl.classList.remove("hidden", "animate-pulse", "border-brand-200", "bg-brand-50", "text-brand-700", "border-rose-200", "bg-rose-50", "text-rose-700", "border-emerald-200", "bg-emerald-50", "text-emerald-700");
+    if (type === "error") {
+      currentAssistantStatusEl.classList.add("border-rose-200", "bg-rose-50", "text-rose-700");
+    } else if (type === "done") {
+      currentAssistantStatusEl.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
+    } else {
+      currentAssistantStatusEl.classList.add("border-brand-200", "bg-brand-50", "text-brand-700", "animate-pulse");
+    }
+    const dots = type === "running" ? `<span class="inline-flex gap-1 mr-2"><span class="dot-1 h-1.5 w-1.5 rounded-full bg-current"></span><span class="dot-2 h-1.5 w-1.5 rounded-full bg-current"></span><span class="dot-3 h-1.5 w-1.5 rounded-full bg-current"></span></span>` : "";
+    currentAssistantStatusEl.innerHTML = `${dots}${escapeHtml(text)} <button type="button" class="ml-2 underline opacity-75 hover:opacity-100" data-open-trace="1">view tool trace</button>`;
     updateTraceToggleButtons();
   }
 
@@ -228,7 +373,7 @@
       return;
     }
     currentAssistantAttachmentsEl.innerHTML = urls
-      .map((url) => `<img src="${url}" class="w-full rounded-xl border border-slate-200 bg-white" alt="Generated plot" />`)
+      .map((url) => `<img src="${url}" class="w-full rounded-xl border border-stone-200 bg-white shadow-sm" alt="Generated plot" />`)
       .join("");
   }
 
@@ -238,27 +383,27 @@
 
     if (!record) {
       const card = document.createElement("div");
-      card.className = "rounded-xl border border-slate-200 bg-slate-50 p-3";
+      card.className = "rounded-xl border border-stone-100 bg-stone-50/50 p-3";
       card.innerHTML = `
         <details class="trace-details" open>
           <summary class="flex cursor-pointer list-none items-center justify-between">
-            <div class="text-xs font-semibold text-slate-800">Step <span class="trace-step"></span> · <span class="trace-tool"></span></div>
+            <div class="text-xs font-semibold text-stone-700">Step <span class="trace-step"></span> · <span class="trace-tool text-stone-500"></span></div>
             <span class="trace-status rounded-full px-2 py-0.5 text-[10px] font-semibold"></span>
           </summary>
-          <div class="mt-2 space-y-2">
+          <div class="mt-3 space-y-2.5">
             <div>
-              <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Action</div>
-              <pre class="trace-action mt-1 max-h-16 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-slate-700"></pre>
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-stone-400">Action</div>
+              <pre class="trace-action mt-1 max-h-16 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2.5 text-[11px] leading-relaxed text-stone-600 border border-stone-100"></pre>
             </div>
             <div>
-              <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Input</div>
-              <pre class="trace-input mt-1 max-h-28 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-slate-700"></pre>
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-stone-400">Input</div>
+              <pre class="trace-input mt-1 max-h-28 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2.5 text-[11px] leading-relaxed text-stone-600 border border-stone-100"></pre>
             </div>
             <div>
-              <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Observation</div>
-              <pre class="trace-observation mt-1 max-h-44 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-slate-700"></pre>
+              <div class="text-[11px] font-semibold uppercase tracking-wider text-stone-400">Observation</div>
+              <pre class="trace-observation mt-1 max-h-44 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2.5 text-[11px] leading-relaxed text-stone-600 border border-stone-100"></pre>
               <div class="trace-plot mt-2 hidden">
-                <img class="trace-plot-img w-full rounded-lg border border-slate-200 bg-white" alt="Generated plot" />
+                <img class="trace-plot-img w-full rounded-lg border border-stone-200 bg-white" alt="Generated plot" />
               </div>
             </div>
           </div>
@@ -325,10 +470,10 @@
     const link = document.createElement("a");
     link.href = `/chat?session=${session.id}`;
     link.dataset.sessionId = String(session.id);
-    link.className = "block rounded-xl border px-3 py-2 text-sm transition border-slate-900 bg-slate-900 text-white";
+    link.className = "group block rounded-xl px-3 py-2.5 text-sm transition-all bg-white/15 text-white";
     link.innerHTML = `
       <p class="truncate font-medium">${escapeHtml(session.title || "New Chat")}</p>
-      <p class="mt-1 truncate text-xs text-slate-200">${escapeHtml(session.last_message || "No messages yet")}</p>
+      <p class="mt-0.5 truncate text-xs text-stone-400">${escapeHtml(session.last_message || "No messages yet")}</p>
     `;
     chatSessionList.prepend(link);
   }
@@ -437,6 +582,7 @@
 
     createBubble("user", text);
     chatInput.value = "";
+    chatInput.style.height = "auto";
     traceStepMap.clear();
     traceLog.innerHTML = "";
     const placeholder = chatLog.querySelector("p.text-sm.text-slate-500");

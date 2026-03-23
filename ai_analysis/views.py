@@ -273,8 +273,10 @@ def api_settings_verify(request: HttpRequest) -> JsonResponse:
         ollama_chat_model=str(payload.get("ollama_chat_model", "")).strip(),
         ollama_embed_model=str(payload.get("ollama_embed_model", "")).strip(),
     )
-    status = 200 if result.get("ok") else 400
-    return JsonResponse({"ok": bool(result.get("ok")), "result": result}, status=status)
+    # Always return HTTP 200 and encode verification outcome in payload["ok"].
+    # This avoids noisy Bad Request logs for expected validation failures
+    # (for example missing models or temporary Ollama connectivity issues).
+    return JsonResponse({"ok": bool(result.get("ok")), "result": result}, status=200)
 
 
 @require_POST

@@ -3,56 +3,97 @@
 {% block title %}Data Visualization{% endblock %}
 
 {% block content %}
-<div class="space-y-6">
-  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-slate-900">Dynamic Data Filters</h2>
-      {% if active_upload %}
-        <span class="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">{{ active_upload.original_filename }}</span>
-      {% else %}
-        <span class="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">No active dataset</span>
-      {% endif %}
-    </div>
-    <p class="mt-1 text-sm text-slate-600">Filter controls are generated from column types of the active Excel sheet.</p>
-    <div id="filters-container" class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3"></div>
-    <div class="mt-4 flex items-center gap-3">
-      <button id="apply-filters" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">Apply Filters</button>
-      <button id="reset-filters" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Reset</button>
-      <span id="query-status" class="text-sm text-slate-500"></span>
-    </div>
-  </section>
-
-  <section class="grid gap-6 lg:grid-cols-3">
-    <div class="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
-      <h3 class="mb-3 text-sm font-semibold text-slate-800">Rows Over Time</h3>
-      <div class="min-h-0 flex-1"><canvas id="chart-time" class="h-full w-full"></canvas></div>
-    </div>
-    <div class="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
-      <h3 class="mb-3 text-sm font-semibold text-slate-800">Top Category Breakdown</h3>
-      <div class="min-h-0 flex-1"><canvas id="chart-categories" class="h-full w-full"></canvas></div>
-    </div>
-    <div class="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
-      <h3 class="mb-3 text-sm font-semibold text-slate-800">Top Entities</h3>
-      <div class="min-h-0 flex-1"><canvas id="chart-customers" class="h-full w-full"></canvas></div>
-    </div>
-  </section>
-
-  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
-    <div class="flex items-center justify-between">
-      <h3 class="text-base font-semibold text-slate-900">Filtered Rows</h3>
-      <div class="flex items-center gap-2">
-        <button id="prev-page" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100">Prev</button>
-        <span id="page-label" class="text-xs text-slate-600">Page 1</span>
-        <button id="next-page" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100">Next</button>
+<div class="mx-auto max-w-[1380px] space-y-6">
+  {# Page header + filters #}
+  <div class="rounded-3xl border border-slate-200 bg-white/90 shadow-card backdrop-blur-sm">
+    <div class="border-b border-slate-100 px-6 py-5">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-bold tracking-tight text-slate-900">Data Explorer</h2>
+          <p class="mt-0.5 text-sm text-slate-600">Dynamic filters, charts, and row-level browsing in one view.</p>
+        </div>
+        {% if active_upload %}
+          <span class="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-1.5 text-xs font-semibold text-emerald-700 shadow-soft">
+            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+            {{ active_upload.original_filename }}
+          </span>
+        {% else %}
+          <span class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-1.5 text-xs font-medium text-slate-500">
+            <span class="h-2 w-2 rounded-full bg-slate-300"></span>
+            No active dataset
+          </span>
+        {% endif %}
       </div>
     </div>
-    <div class="mt-4 overflow-x-auto">
+
+    <div class="px-6 py-5">
+      <div class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-400">Filters</div>
+      <div id="filters-container" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3"></div>
+      <div class="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
+        <button id="apply-filters" class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow-md">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"/></svg>
+          Apply Filters
+        </button>
+        <button id="reset-filters" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-medium text-slate-600 transition-all hover:bg-slate-50 hover:shadow-sm">Reset</button>
+        <span id="query-status" class="text-sm text-slate-500"></span>
+      </div>
+    </div>
+  </div>
+
+  {# Charts #}
+  <div class="grid gap-6 lg:grid-cols-3">
+    <div class="flex h-[22rem] min-h-[22rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
+      <div class="mb-3 flex items-center gap-2">
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-100 text-brand-600">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18L9 11.25l4.306 4.307a11.95 11.95 0 015.814-5.519l2.74-1.22m0 0l-5.94-2.28m5.94 2.28l-2.28 5.941"/></svg>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-700">Rows Over Time</h3>
+      </div>
+      <div class="relative min-h-0 flex-1 overflow-hidden"><canvas id="chart-time" class="h-full w-full"></canvas></div>
+    </div>
+    <div class="flex h-[22rem] min-h-[22rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
+      <div class="mb-3 flex items-center gap-2">
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-100 text-brand-600">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-700">Top Categories</h3>
+      </div>
+      <div class="relative min-h-0 flex-1 overflow-hidden"><canvas id="chart-categories" class="h-full w-full"></canvas></div>
+    </div>
+    <div class="flex h-[22rem] min-h-[22rem] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white p-5 shadow-card">
+      <div class="mb-3 flex items-center gap-2">
+        <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-brand-100 text-brand-600">
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+        </div>
+        <h3 class="text-sm font-semibold text-slate-700">Top Entities</h3>
+      </div>
+      <div class="relative min-h-0 flex-1 overflow-hidden"><canvas id="chart-customers" class="h-full w-full"></canvas></div>
+    </div>
+  </div>
+
+  {# Data table #}
+  <div class="rounded-3xl border border-slate-200 bg-white shadow-card">
+    <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+      <h3 class="text-base font-semibold text-slate-900">Filtered Rows</h3>
+      <div class="flex items-center gap-2">
+        <button id="prev-page" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50 hover:shadow-sm">
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/></svg>
+          Prev
+        </button>
+        <span id="page-label" class="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-600">Page 1</span>
+        <button id="next-page" class="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-all hover:bg-slate-50 hover:shadow-sm">
+          Next
+          <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+        </button>
+      </div>
+    </div>
+    <div class="overflow-x-auto">
       <table class="min-w-full table-fixed text-left text-sm">
-        <thead id="table-head" class="bg-slate-50 text-slate-700"></thead>
-        <tbody id="table-body"></tbody>
+        <thead id="table-head" class="border-b border-slate-100 text-xs font-semibold uppercase tracking-wider text-slate-400"></thead>
+        <tbody id="table-body" class="divide-y divide-slate-100"></tbody>
       </table>
     </div>
-  </section>
+  </div>
 </div>
 {% endblock %}
 
@@ -76,52 +117,54 @@
 
   const timeChart = new Chart(document.getElementById("chart-time"), {
     type: "line",
-    data: { labels: [], datasets: [{ label: "Rows", data: [], borderColor: "#11998e", backgroundColor: "rgba(17,153,142,0.15)" }] },
-    options: { responsive: true, maintainAspectRatio: false }
+    data: { labels: [], datasets: [{ label: "Rows", data: [], borderColor: "#1b776c", backgroundColor: "rgba(33,150,134,0.15)", fill: true, tension: 0.3 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
 
   const categoriesChart = new Chart(document.getElementById("chart-categories"), {
     type: "bar",
-    data: { labels: [], datasets: [{ label: "Category", data: [], backgroundColor: "#0f8179" }] },
-    options: { responsive: true, maintainAspectRatio: false }
+    data: { labels: [], datasets: [{ label: "Category", data: [], backgroundColor: "#219686", borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
   });
 
   const customersChart = new Chart(document.getElementById("chart-customers"), {
     type: "bar",
-    data: { labels: [], datasets: [{ label: "Entity", data: [], backgroundColor: "#3b82f6" }] },
-    options: { responsive: true, maintainAspectRatio: false, indexAxis: "y" }
+    data: { labels: [], datasets: [{ label: "Entity", data: [], backgroundColor: "#1d2a33", borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: "y", plugins: { legend: { display: false } } }
   });
 
   function renderFilters() {
     filtersContainer.innerHTML = "";
     schema.forEach((item) => {
       const wrap = document.createElement("div");
-      wrap.className = "rounded-lg border border-slate-200 p-3";
+      wrap.className = "rounded-2xl border border-slate-200 bg-slate-50/70 p-4";
       wrap.dataset.column = item.column;
       wrap.dataset.type = item.type;
 
       const title = document.createElement("h4");
-      title.className = "mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600";
+      title.className = "mb-2.5 text-xs font-semibold uppercase tracking-wider text-slate-400";
       title.textContent = item.column;
       wrap.appendChild(title);
+
+      const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-700 transition-colors focus:border-brand-400 focus:outline-none focus:ring-1 focus:ring-brand-200";
 
       if (item.type === "numeric") {
         wrap.innerHTML += `
           <div class="space-y-2">
-            <input data-field="min" type="number" placeholder="Min (${item.min})" class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />
-            <input data-field="max" type="number" placeholder="Max (${item.max})" class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />
+            <input data-field="min" type="number" placeholder="Min (${item.min})" class="${inputClass}" />
+            <input data-field="max" type="number" placeholder="Max (${item.max})" class="${inputClass}" />
           </div>`;
       } else if (item.type === "datetime") {
         wrap.innerHTML += `
           <div class="space-y-2">
-            <input data-field="start" type="date" class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />
-            <input data-field="end" type="date" class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />
+            <input data-field="start" type="date" class="${inputClass}" />
+            <input data-field="end" type="date" class="${inputClass}" />
           </div>`;
       } else if (item.type === "categorical") {
         const options = (item.options || []).map((v) => `<option value="${v}">${v}</option>`).join("");
-        wrap.innerHTML += `<select data-field="values" multiple class="h-24 w-full rounded border border-slate-300 px-2 py-1 text-xs">${options}</select>`;
+        wrap.innerHTML += `<select data-field="values" multiple class="h-24 ${inputClass}">${options}</select>`;
       } else {
-        wrap.innerHTML += `<input data-field="contains" type="text" placeholder="Contains..." class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />`;
+        wrap.innerHTML += `<input data-field="contains" type="text" placeholder="Contains..." class="${inputClass}" />`;
       }
 
       filtersContainer.appendChild(wrap);
@@ -158,7 +201,7 @@
     const headRow = document.createElement("tr");
     columns.forEach((col) => {
       const th = document.createElement("th");
-      th.className = "px-3 py-2";
+      th.className = "px-6 py-3";
       th.textContent = col;
       headRow.appendChild(th);
     });
@@ -166,10 +209,10 @@
 
     rows.forEach((row) => {
       const tr = document.createElement("tr");
-      tr.className = "border-t border-slate-100";
+      tr.className = "hover:bg-slate-50/70 transition-colors";
       columns.forEach((col) => {
         const td = document.createElement("td");
-        td.className = "px-3 py-2 text-xs text-slate-700";
+        td.className = "px-6 py-3 text-xs text-slate-600";
         const value = row[col] ?? "";
         td.textContent = value;
         td.title = String(value);

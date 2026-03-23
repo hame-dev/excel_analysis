@@ -254,3 +254,33 @@ def test_settings_page_and_runtime_apis(client, monkeypatch: pytest.MonkeyPatch)
     assert config is not None
     assert config.verified_at is not None
     assert config.custom_prompt == "Use markdown tables when useful."
+
+
+@pytest.mark.django_db
+def test_settings_verify_failure_returns_200_with_ok_false(client, monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_verify(**_kwargs):
+        return {
+            "ok": False,
+            "message": "Missing models.",
+            "missing_models": ["qwen3.5:9b"],
+            "available_models": ["nomic-embed-text"],
+        }
+
+    monkeypatch.setattr("ai_analysis.views.verify_ollama_settings", fake_verify)
+
+    response = client.post(
+        "/api/settings/verify",
+        data=json.dumps(
+            {
+                "ollama_base_url": "http://127.0.0.1:11434",
+                "ollama_qa_model": "qwen3.5:9b",
+                "ollama_chat_model": "qwen3.5:9b",
+                "ollama_embed_model": "nomic-embed-text",
+            }
+        ),
+        content_type="application/json",
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["result"]["missing_models"] == ["qwen3.5:9b"]

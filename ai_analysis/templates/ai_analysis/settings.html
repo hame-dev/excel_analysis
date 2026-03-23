@@ -3,72 +3,119 @@
 {% block title %}Runtime Settings{% endblock %}
 
 {% block content %}
-<section class="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
-  <div class="flex items-center justify-between">
-    <div>
-      <h2 class="text-lg font-semibold text-slate-900">Runtime Settings</h2>
-      <p class="mt-1 text-sm text-slate-600">Optional custom prompt and editable Ollama runtime config.</p>
-    </div>
-    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
-      {% if runtime_config.verified_at %}Verified{% else %}Not Verified{% endif %}
-    </span>
+<div class="mx-auto max-w-4xl">
+  {# Page header #}
+  <div class="mb-6 rounded-3xl border border-slate-200 bg-white/80 px-6 py-6 shadow-card backdrop-blur-sm sm:px-8">
+    <h2 class="text-2xl font-bold tracking-tight text-slate-900">Runtime Settings</h2>
+    <p class="mt-1 text-[15px] text-slate-600">Configure Ollama connection, models, and optional custom prompt instructions.</p>
   </div>
 
-  <div class="mt-6 flex gap-2 rounded-xl bg-slate-100 p-1">
-    <button id="tab-prompt-btn" type="button" class="tab-btn flex-1 rounded-lg px-3 py-2 text-sm font-semibold" data-tab="prompt">
+  {# Status badge #}
+  <div id="verify-banner" class="mb-6 flex items-center gap-3 rounded-2xl border px-5 py-4 shadow-soft {% if runtime_config.verified_at %}border-emerald-200 bg-emerald-50/60{% else %}border-amber-200 bg-amber-50/60{% endif %}">
+    <div id="verify-banner-icon-wrap" class="flex h-10 w-10 items-center justify-center rounded-xl {% if runtime_config.verified_at %}bg-emerald-100 text-emerald-600{% else %}bg-amber-100 text-amber-600{% endif %}">
+      <svg id="verify-icon-success" class="h-5 w-5 {% if not runtime_config.verified_at %}hidden{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      <svg id="verify-icon-warning" class="h-5 w-5 {% if runtime_config.verified_at %}hidden{% endif %}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+    </div>
+    <div>
+      <div id="verify-banner-title" class="text-sm font-semibold {% if runtime_config.verified_at %}text-emerald-800{% else %}text-amber-800{% endif %}">
+        {% if runtime_config.verified_at %}Ollama Connected{% else %}Ollama Not Verified{% endif %}
+      </div>
+      <div id="verify-banner-subtitle" class="text-xs {% if runtime_config.verified_at %}text-emerald-600{% else %}text-amber-600{% endif %}">
+        {% if runtime_config.verified_at %}Last verified: {{ runtime_config.verified_at }}{% else %}Verify your Ollama connection to start chatting{% endif %}
+      </div>
+    </div>
+  </div>
+
+  {# Tab navigation #}
+  <div class="flex gap-1 rounded-2xl bg-slate-100 p-1.5">
+    <button id="tab-prompt-btn" type="button" class="tab-btn flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all" data-tab="prompt">
       Custom Prompt
     </button>
-    <button id="tab-ollama-btn" type="button" class="tab-btn flex-1 rounded-lg px-3 py-2 text-sm font-semibold" data-tab="ollama">
-      Ollama
+    <button id="tab-ollama-btn" type="button" class="tab-btn flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all" data-tab="ollama">
+      Ollama Configuration
     </button>
   </div>
 
-  <div id="tab-prompt" class="tab-panel mt-5">
-    <label for="custom-prompt" class="mb-2 block text-sm font-medium text-slate-700">Custom prompt (optional)</label>
-    <textarea
-      id="custom-prompt"
-      rows="12"
-      class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:border-brand-500 focus:outline-none"
-      placeholder="Optional instructions injected into SQL + assistant prompts..."
-    >{{ runtime_config.custom_prompt }}</textarea>
-    <p class="mt-2 text-xs text-slate-500">Leave blank to use default prompt behavior only.</p>
-  </div>
-
-  <div id="tab-ollama" class="tab-panel mt-5 hidden space-y-4">
-    <div class="grid gap-4 md:grid-cols-2">
-      <div class="md:col-span-2">
-        <label for="ollama-base-url" class="mb-1 block text-sm font-medium text-slate-700">Ollama Base URL</label>
-        <input id="ollama-base-url" type="text" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="{{ runtime_config.ollama_base_url }}" />
+  {# Custom Prompt Panel #}
+  <div id="tab-prompt" class="tab-panel mt-6">
+    <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-card">
+      <div class="mb-4">
+        <h3 class="text-base font-semibold text-slate-800">System Prompt</h3>
+        <p class="mt-0.5 text-sm text-slate-500">Optional instructions injected into SQL and assistant prompts.</p>
       </div>
-      <div>
-        <label for="ollama-qa-model" class="mb-1 block text-sm font-medium text-slate-700">QA Model</label>
-        <input id="ollama-qa-model" type="text" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="{{ runtime_config.ollama_qa_model }}" />
-      </div>
-      <div>
-        <label for="ollama-chat-model" class="mb-1 block text-sm font-medium text-slate-700">Chat Model</label>
-        <input id="ollama-chat-model" type="text" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="{{ runtime_config.ollama_chat_model }}" />
-      </div>
-      <div class="md:col-span-2">
-        <label for="ollama-embed-model" class="mb-1 block text-sm font-medium text-slate-700">Embedding Model</label>
-        <input id="ollama-embed-model" type="text" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="{{ runtime_config.ollama_embed_model }}" />
-      </div>
+      <textarea
+        id="custom-prompt"
+        rows="12"
+        class="w-full rounded-2xl border border-slate-200 bg-surface-50 px-4 py-3.5 text-sm leading-relaxed text-slate-700 placeholder:text-slate-400 transition-colors focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200/60"
+        placeholder="e.g., Always respond in bullet points. Focus on financial metrics. Use Arabic column names..."
+      >{{ runtime_config.custom_prompt }}</textarea>
+      <p class="mt-2 text-xs text-slate-400">Leave blank to use default prompt behavior only.</p>
     </div>
-    <p class="text-xs text-slate-500">
-      Last verified:
-      <span id="verified-at-text">{% if runtime_config.verified_at %}{{ runtime_config.verified_at }}{% else %}Never{% endif %}</span>
-    </p>
   </div>
 
-  <div class="mt-6 flex flex-wrap gap-3">
-    <button id="verify-btn" type="button" class="rounded-lg border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100">
-      Verify Ollama API
+  {# Ollama Config Panel #}
+  <div id="tab-ollama" class="tab-panel mt-6 hidden">
+    <div class="space-y-4">
+      {# Base URL - full width card #}
+      <div class="rounded-3xl border border-slate-200 bg-white p-6 shadow-card">
+        <div class="flex items-start gap-4">
+          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-600">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418"/></svg>
+          </div>
+          <div class="flex-1">
+            <label for="ollama-base-url" class="block text-sm font-semibold text-slate-800">Base URL</label>
+            <p class="mt-0.5 text-xs text-slate-500">The URL where your Ollama instance is running</p>
+            <input id="ollama-base-url" type="text" class="mt-3 w-full rounded-xl border border-slate-200 bg-surface-50 px-4 py-2.5 text-sm text-slate-700 transition-colors focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200/60" value="{{ runtime_config.ollama_base_url }}" placeholder="http://localhost:11434" />
+          </div>
+        </div>
+      </div>
+
+      {# Models - grid #}
+      <div class="grid gap-4 md:grid-cols-2">
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+          <label for="ollama-qa-model" class="block text-sm font-semibold text-slate-800">QA Model</label>
+          <p class="mt-0.5 text-xs text-slate-500">Used for SQL queries and analysis</p>
+          <input id="ollama-qa-model" type="text" class="mt-3 w-full rounded-xl border border-slate-200 bg-surface-50 px-4 py-2.5 text-sm text-slate-700 transition-colors focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200/60" value="{{ runtime_config.ollama_qa_model }}" />
+        </div>
+        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+          <label for="ollama-chat-model" class="block text-sm font-semibold text-slate-800">Chat Model</label>
+          <p class="mt-0.5 text-xs text-slate-500">Used for conversational responses</p>
+          <input id="ollama-chat-model" type="text" class="mt-3 w-full rounded-xl border border-slate-200 bg-surface-50 px-4 py-2.5 text-sm text-slate-700 transition-colors focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200/60" value="{{ runtime_config.ollama_chat_model }}" />
+        </div>
+      </div>
+
+      <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-card">
+        <div class="flex items-start gap-4">
+          <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-brand-100 text-brand-600">
+            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></svg>
+          </div>
+          <div class="flex-1">
+            <label for="ollama-embed-model" class="block text-sm font-semibold text-slate-800">Embedding Model</label>
+            <p class="mt-0.5 text-xs text-slate-500">Used for vector search and semantic similarity</p>
+            <input id="ollama-embed-model" type="text" class="mt-3 w-full rounded-xl border border-slate-200 bg-surface-50 px-4 py-2.5 text-sm text-slate-700 transition-colors focus:border-brand-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200/60" value="{{ runtime_config.ollama_embed_model }}" />
+          </div>
+        </div>
+      </div>
+
+      <p class="text-xs text-slate-400 pl-1">
+        Last verified: <span id="verified-at-text">{% if runtime_config.verified_at %}{{ runtime_config.verified_at }}{% else %}Never{% endif %}</span>
+      </p>
+    </div>
+  </div>
+
+  {# Actions #}
+  <div class="mt-8 flex flex-wrap items-center gap-3 border-t border-slate-200 pt-6">
+    <button id="verify-btn" type="button" class="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-2.5 text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md">
+      <svg class="h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+      Verify Connection
     </button>
-    <button id="save-btn" type="button" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+    <button id="save-btn" type="button" class="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-all hover:bg-slate-800 hover:shadow-md">
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
       Save Settings
     </button>
-    <span id="settings-status" class="self-center text-sm text-slate-600"></span>
+    <span id="settings-status" class="text-sm text-slate-600"></span>
   </div>
-</section>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -88,6 +135,12 @@
   const saveBtn = document.getElementById("save-btn");
   const statusEl = document.getElementById("settings-status");
   const verifiedAtText = document.getElementById("verified-at-text");
+  const verifyBanner = document.getElementById("verify-banner");
+  const verifyBannerIconWrap = document.getElementById("verify-banner-icon-wrap");
+  const verifyIconSuccess = document.getElementById("verify-icon-success");
+  const verifyIconWarning = document.getElementById("verify-icon-warning");
+  const verifyBannerTitle = document.getElementById("verify-banner-title");
+  const verifyBannerSubtitle = document.getElementById("verify-banner-subtitle");
 
   const initialSignature = [
     "{{ runtime_config.ollama_base_url|escapejs }}",
@@ -101,8 +154,9 @@
     tabButtons.forEach((btn) => {
       const isActive = btn.dataset.tab === tab;
       btn.classList.toggle("bg-white", isActive);
+      btn.classList.toggle("shadow-sm", isActive);
       btn.classList.toggle("text-slate-900", isActive);
-      btn.classList.toggle("text-slate-600", !isActive);
+      btn.classList.toggle("text-slate-500", !isActive);
     });
     Object.entries(tabPanels).forEach(([name, panel]) => {
       panel.classList.toggle("hidden", name !== tab);
@@ -130,10 +184,39 @@
 
   function setStatus(text, tone = "neutral") {
     statusEl.textContent = text;
-    statusEl.className = "self-center text-sm";
+    statusEl.className = "text-sm";
     if (tone === "success") statusEl.classList.add("text-emerald-700");
     else if (tone === "error") statusEl.classList.add("text-rose-700");
     else statusEl.classList.add("text-slate-600");
+  }
+
+  function setVerificationBanner(verified, subtitle) {
+    if (!verifyBanner || !verifyBannerIconWrap || !verifyBannerTitle || !verifyBannerSubtitle) return;
+
+    verifyBanner.classList.remove("border-emerald-200", "bg-emerald-50/60", "border-amber-200", "bg-amber-50/60");
+    verifyBannerIconWrap.classList.remove("bg-emerald-100", "text-emerald-600", "bg-amber-100", "text-amber-600");
+    verifyBannerTitle.classList.remove("text-emerald-800", "text-amber-800");
+    verifyBannerSubtitle.classList.remove("text-emerald-600", "text-amber-600");
+
+    if (verified) {
+      verifyBanner.classList.add("border-emerald-200", "bg-emerald-50/60");
+      verifyBannerIconWrap.classList.add("bg-emerald-100", "text-emerald-600");
+      verifyBannerTitle.classList.add("text-emerald-800");
+      verifyBannerSubtitle.classList.add("text-emerald-600");
+      verifyBannerTitle.textContent = "Ollama Connected";
+      verifyIconSuccess?.classList.remove("hidden");
+      verifyIconWarning?.classList.add("hidden");
+    } else {
+      verifyBanner.classList.add("border-amber-200", "bg-amber-50/60");
+      verifyBannerIconWrap.classList.add("bg-amber-100", "text-amber-600");
+      verifyBannerTitle.classList.add("text-amber-800");
+      verifyBannerSubtitle.classList.add("text-amber-600");
+      verifyBannerTitle.textContent = "Ollama Not Verified";
+      verifyIconSuccess?.classList.add("hidden");
+      verifyIconWarning?.classList.remove("hidden");
+    }
+
+    verifyBannerSubtitle.textContent = subtitle || (verified ? "Verified." : "Verify your Ollama connection to start chatting");
   }
 
   async function verifySettings() {
@@ -179,8 +262,10 @@
     try {
       const result = await verifySettings();
       setStatus(result.message || "Verification successful.", "success");
+      setVerificationBanner(true, "Verified. Click Save Settings to persist verification.");
     } catch (error) {
       setStatus(error.message || "Verification failed.", "error");
+      setVerificationBanner(false, "Verification failed. Fix settings and verify again.");
     } finally {
       verifyBtn.disabled = false;
     }
@@ -197,7 +282,10 @@
     setStatus("Saving settings...", "neutral");
     try {
       const data = await saveSettings(sig === verifiedSignature);
-      if (data?.config?.verified_at) verifiedAtText.textContent = data.config.verified_at;
+      if (data?.config?.verified_at) {
+        verifiedAtText.textContent = data.config.verified_at;
+        setVerificationBanner(true, `Last verified: ${data.config.verified_at}`);
+      }
       setStatus("Settings saved.", "success");
     } catch (error) {
       setStatus(error.message || "Failed to save settings.", "error");
@@ -210,6 +298,7 @@
     el.addEventListener("input", () => {
       if (verifiedSignature && ollamaSignature() !== verifiedSignature) {
         setStatus("Ollama fields changed. Verify again before saving.", "neutral");
+        setVerificationBanner(false, "Ollama fields changed. Verify again before saving.");
       }
     });
   });

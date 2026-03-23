@@ -4,46 +4,78 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{% block title %}Excel Agent{% endblock %}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@1.9.12"></script>
   <script>
     tailwind.config = {
       theme: {
         extend: {
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'monospace']
+          },
           colors: {
             brand: {
-              50: "#effaf8",
-              100: "#d9f3ee",
-              500: "#11998e",
-              600: "#0f8179",
-              700: "#0e6e67"
+              50: "#effcf9",
+              100: "#d4f4ec",
+              200: "#a8e7d8",
+              300: "#74d5c1",
+              400: "#3bb8a2",
+              500: "#219686",
+              600: "#1b776c",
+              700: "#175f56"
+            },
+            surface: {
+              50: "#f6f9fb",
+              100: "#eff4f7",
+              200: "#dde5eb",
+              800: "#1d2a33",
+              900: "#111a20"
             }
           },
           boxShadow: {
-            soft: "0 10px 30px rgba(0, 0, 0, 0.08)"
+            soft: "0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06)",
+            card: "0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05)",
+            input: "0 0 0 1px rgba(0,0,0,0.04), 0 2px 8px rgba(0,0,0,0.04)",
+            elevated: "0 8px 30px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.04)"
           }
         }
       }
     };
   </script>
+  <style>
+    ::selection { background-color: rgba(33, 150, 134, 0.2); }
+    input, textarea, select, button, a { transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1); }
+  </style>
 </head>
-<body class="min-h-screen bg-gradient-to-br from-slate-50 via-slate-100 to-brand-50 text-slate-800">
-  <header class="border-b border-slate-200 bg-white/80 backdrop-blur">
-    <div class="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-      <div>
-        <h1 class="text-xl font-bold tracking-tight text-slate-900">Excel Analysis Agent</h1>
-        <p class="text-sm text-slate-500">Django + Ollama + SQLite + DataFrame + Tools</p>
+<body class="{% block body_class %}min-h-screen bg-surface-50 font-sans text-slate-800 antialiased{% endblock %}">
+  <div class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+    <div class="absolute -left-20 top-0 h-[28rem] w-[28rem] rounded-full bg-gradient-to-br from-brand-200/55 to-brand-100/10 blur-3xl"></div>
+    <div class="absolute right-0 top-24 h-[24rem] w-[24rem] rounded-full bg-gradient-to-bl from-sky-200/40 to-white/10 blur-3xl"></div>
+  </div>
+
+  <header class="sticky top-0 z-40 border-b border-slate-200/70 bg-white/85 backdrop-blur-xl">
+    <div class="mx-auto flex w-full max-w-[1380px] items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+      <a href="/upload" class="flex items-center gap-3">
+        <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-700 text-[11px] font-bold tracking-tight text-white shadow-soft">AI</div>
+        <div>
+          <h1 class="text-[15px] font-semibold text-slate-900">AI Analysis</h1>
+          <p class="text-[11px] text-slate-500">Excel + SQL + Agent Tools</p>
+        </div>
+      </a>
+      <div class="flex items-center gap-2">
+        <nav class="rounded-2xl border border-slate-200 bg-white/90 p-1 text-sm shadow-soft">
+          <a href="/upload" class="inline-flex rounded-xl px-3.5 py-1.5 font-semibold {% if request.path == '/upload' %}bg-slate-900 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-100 hover:text-slate-900{% endif %}">Upload</a>
+          <a href="/chat" class="inline-flex rounded-xl px-3.5 py-1.5 font-semibold {% if request.path == '/chat' %}bg-slate-900 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-100 hover:text-slate-900{% endif %}">Chat</a>
+          <a href="/visualization" class="inline-flex rounded-xl px-3.5 py-1.5 font-semibold {% if request.path == '/visualization' %}bg-slate-900 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-100 hover:text-slate-900{% endif %}">Visualization</a>
+          <a href="/settings" class="inline-flex rounded-xl px-3.5 py-1.5 font-semibold {% if request.path == '/settings' %}bg-slate-900 text-white shadow-sm{% else %}text-slate-600 hover:bg-slate-100 hover:text-slate-900{% endif %}">Settings</a>
+        </nav>
       </div>
-      <nav class="flex gap-2 text-sm">
-        <a href="/upload" class="rounded-lg px-3 py-2 font-medium hover:bg-slate-100">Upload</a>
-        <a href="/chat" class="rounded-lg px-3 py-2 font-medium hover:bg-slate-100">Chat</a>
-        <a href="/visualization" class="rounded-lg px-3 py-2 font-medium hover:bg-slate-100">Visualization</a>
-        <a href="/settings" class="rounded-lg px-3 py-2 font-medium hover:bg-slate-100">Settings</a>
-      </nav>
     </div>
   </header>
 
-  <main class="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+  <main class="{% block main_class %}mx-auto w-full max-w-[1380px] px-4 pb-8 pt-6 sm:px-6 lg:px-8{% endblock %}">
     {% block content %}{% endblock %}
   </main>
 

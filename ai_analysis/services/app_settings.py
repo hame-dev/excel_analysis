@@ -102,6 +102,50 @@ def _json_request(url: str, method: str = "GET", payload: dict[str, Any] | None 
     return json.loads(raw) if raw else {}
 
 
+def _normalize_model_name(name: str) -> str:
+    return str(name or "").strip().lower()
+
+
+def _has_explicit_model_tag(name: str) -> bool:
+    normalized = _normalize_model_name(name)
+    if not normalized:
+        return False
+    last_slash = normalized.rfind("/")
+    last_colon = normalized.rfind(":")
+    return last_colon > last_slash
+
+
+def _model_base_name(name: str) -> str:
+    normalized = _normalize_model_name(name)
+    if not normalized:
+        return ""
+    if not _has_explicit_model_tag(normalized):
+        return normalized
+    return normalized[: normalized.rfind(":")]
+
+
+def _is_requested_model_available(requested_model: str, available_models: list[str]) -> bool:
+    requested = _normalize_model_name(requested_model)
+    if not requested:
+        return False
+
+    available_exact = {_normalize_model_name(model) for model in available_models if str(model or "").strip()}
+    if requested in available_exact:
+        return True
+    if f"{requested}:latest" in available_exact:
+        return True
+
+    # If request omits tag (e.g. "nomic-embed-text"), allow any available tag
+    # for that base model (e.g. "nomic-embed-text:latest").
+    if not _has_explicit_model_tag(requested):
+        requested_base = _model_base_name(requested)
+        available_bases = {_model_base_name(model) for model in available_exact}
+        if requested_base in available_bases:
+            return True
+
+    return False
+
+
 def verify_ollama_settings(
     ollama_base_url: str,
     ollama_qa_model: str,
@@ -138,13 +182,16 @@ def verify_ollama_settings(
             "available_models": [],
         }
 
-    available_models = [
-        str(item.get("name", "")).strip()
-        for item in (tags_payload.get("models") or [])
-        if isinstance(item, dict)
-    ]
+    available_models: list[str] = []
+    for item in (tags_payload.get("models") or []):
+        if not isinstance(item, dict):
+            continue
+        model_name = str(item.get("name") or item.get("model") or "").strip()
+        if model_name:
+            available_models.append(model_name)
+
     requested_models = [qa_model, chat_model, embed_model]
-    missing_models = [m for m in requested_models if m not in set(available_models)]
+    missing_models = [m for m in requested_models if not _is_requested_model_available(m, available_models)]
     if missing_models:
         return {
             "ok": False,
@@ -153,24 +200,9 @@ def verify_ollama_settings(
             "available_models": available_models,
         }
 
-    try:
-        _json_request(
-            f"{base}/api/generate",
-            method="POST",
-            payload={"model": qa_model, "prompt": "Reply exactly with OK", "stream": False},
-            timeout=8,
-        )
-    except Exception as exc:
-        return {
-            "ok": False,
-            "message": f"Model generation test failed for '{qa_model}': {exc}",
-            "missing_models": [],
-            "available_models": available_models,
-        }
-
     return {
         "ok": True,
-        "message": "Ollama connection and model checks passed.",
+        "message": "Ollama connection and model availability checks passed.",
         "missing_models": [],
         "available_models": available_models,
     }
