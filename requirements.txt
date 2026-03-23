@@ -1,0 +1,13 @@
+django
+pandas
+numpy
+openpyxl
+langchain
+langchain-community
+langchain-classic
+langchain-ollama
+chromadb
+pytest
+pytest-django
+requests
+

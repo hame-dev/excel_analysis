@@ -1,0 +1,265 @@
+{% extends "ai_analysis/base.html" %}
+
+{% block title %}Data Visualization{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+    <div class="flex items-center justify-between">
+      <h2 class="text-lg font-semibold text-slate-900">Dynamic Data Filters</h2>
+      {% if active_upload %}
+        <span class="rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">{{ active_upload.original_filename }}</span>
+      {% else %}
+        <span class="rounded-full bg-rose-100 px-3 py-1 text-xs font-semibold text-rose-700">No active dataset</span>
+      {% endif %}
+    </div>
+    <p class="mt-1 text-sm text-slate-600">Filter controls are generated from column types of the active Excel sheet.</p>
+    <div id="filters-container" class="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-3"></div>
+    <div class="mt-4 flex items-center gap-3">
+      <button id="apply-filters" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">Apply Filters</button>
+      <button id="reset-filters" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Reset</button>
+      <span id="query-status" class="text-sm text-slate-500"></span>
+    </div>
+  </section>
+
+  <section class="grid gap-6 lg:grid-cols-3">
+    <div class="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
+      <h3 class="mb-3 text-sm font-semibold text-slate-800">Rows Over Time</h3>
+      <div class="min-h-0 flex-1"><canvas id="chart-time" class="h-full w-full"></canvas></div>
+    </div>
+    <div class="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
+      <h3 class="mb-3 text-sm font-semibold text-slate-800">Top Category Breakdown</h3>
+      <div class="min-h-0 flex-1"><canvas id="chart-categories" class="h-full w-full"></canvas></div>
+    </div>
+    <div class="flex h-80 flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-soft">
+      <h3 class="mb-3 text-sm font-semibold text-slate-800">Top Entities</h3>
+      <div class="min-h-0 flex-1"><canvas id="chart-customers" class="h-full w-full"></canvas></div>
+    </div>
+  </section>
+
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+    <div class="flex items-center justify-between">
+      <h3 class="text-base font-semibold text-slate-900">Filtered Rows</h3>
+      <div class="flex items-center gap-2">
+        <button id="prev-page" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100">Prev</button>
+        <span id="page-label" class="text-xs text-slate-600">Page 1</span>
+        <button id="next-page" class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100">Next</button>
+      </div>
+    </div>
+    <div class="mt-4 overflow-x-auto">
+      <table class="min-w-full table-fixed text-left text-sm">
+        <thead id="table-head" class="bg-slate-50 text-slate-700"></thead>
+        <tbody id="table-body"></tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  const filtersContainer = document.getElementById("filters-container");
+  const applyButton = document.getElementById("apply-filters");
+  const resetButton = document.getElementById("reset-filters");
+  const queryStatus = document.getElementById("query-status");
+  const tableHead = document.getElementById("table-head");
+  const tableBody = document.getElementById("table-body");
+  const prevPageBtn = document.getElementById("prev-page");
+  const nextPageBtn = document.getElementById("next-page");
+  const pageLabel = document.getElementById("page-label");
+
+  let schema = [];
+  let currentPage = 1;
+  let totalRows = 0;
+  const pageSize = 30;
+
+  const timeChart = new Chart(document.getElementById("chart-time"), {
+    type: "line",
+    data: { labels: [], datasets: [{ label: "Rows", data: [], borderColor: "#11998e", backgroundColor: "rgba(17,153,142,0.15)" }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  const categoriesChart = new Chart(document.getElementById("chart-categories"), {
+    type: "bar",
+    data: { labels: [], datasets: [{ label: "Category", data: [], backgroundColor: "#0f8179" }] },
+    options: { responsive: true, maintainAspectRatio: false }
+  });
+
+  const customersChart = new Chart(document.getElementById("chart-customers"), {
+    type: "bar",
+    data: { labels: [], datasets: [{ label: "Entity", data: [], backgroundColor: "#3b82f6" }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: "y" }
+  });
+
+  function renderFilters() {
+    filtersContainer.innerHTML = "";
+    schema.forEach((item) => {
+      const wrap = document.createElement("div");
+      wrap.className = "rounded-lg border border-slate-200 p-3";
+      wrap.dataset.column = item.column;
+      wrap.dataset.type = item.type;
+
+      const title = document.createElement("h4");
+      title.className = "mb-2 text-xs font-semibold uppercase tracking-wide text-slate-600";
+      title.textContent = item.column;
+      wrap.appendChild(title);
+
+      if (item.type === "numeric") {
+        wrap.innerHTML += `
+          <div class="space-y-2">
+            <input data-field="min" type="number" placeholder="Min (${item.min})" class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />
+            <input data-field="max" type="number" placeholder="Max (${item.max})" class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />
+          </div>`;
+      } else if (item.type === "datetime") {
+        wrap.innerHTML += `
+          <div class="space-y-2">
+            <input data-field="start" type="date" class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />
+            <input data-field="end" type="date" class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />
+          </div>`;
+      } else if (item.type === "categorical") {
+        const options = (item.options || []).map((v) => `<option value="${v}">${v}</option>`).join("");
+        wrap.innerHTML += `<select data-field="values" multiple class="h-24 w-full rounded border border-slate-300 px-2 py-1 text-xs">${options}</select>`;
+      } else {
+        wrap.innerHTML += `<input data-field="contains" type="text" placeholder="Contains..." class="w-full rounded border border-slate-300 px-2 py-1 text-xs" />`;
+      }
+
+      filtersContainer.appendChild(wrap);
+    });
+  }
+
+  function collectFilters() {
+    const rules = {};
+    filtersContainer.querySelectorAll("div[data-column]").forEach((block) => {
+      const column = block.dataset.column;
+      const type = block.dataset.type;
+      if (type === "numeric") {
+        const min = block.querySelector('[data-field="min"]').value;
+        const max = block.querySelector('[data-field="max"]').value;
+        if (min || max) rules[column] = { type, min: min || null, max: max || null };
+      } else if (type === "datetime") {
+        const start = block.querySelector('[data-field="start"]').value;
+        const end = block.querySelector('[data-field="end"]').value;
+        if (start || end) rules[column] = { type, start: start || null, end: end || null };
+      } else if (type === "categorical") {
+        const values = Array.from(block.querySelector('[data-field="values"]').selectedOptions).map((o) => o.value);
+        if (values.length) rules[column] = { type, values };
+      } else if (type === "text") {
+        const contains = block.querySelector('[data-field="contains"]').value.trim();
+        if (contains) rules[column] = { type, contains };
+      }
+    });
+    return rules;
+  }
+
+  function renderTable(columns, rows) {
+    tableHead.innerHTML = "";
+    tableBody.innerHTML = "";
+    const headRow = document.createElement("tr");
+    columns.forEach((col) => {
+      const th = document.createElement("th");
+      th.className = "px-3 py-2";
+      th.textContent = col;
+      headRow.appendChild(th);
+    });
+    tableHead.appendChild(headRow);
+
+    rows.forEach((row) => {
+      const tr = document.createElement("tr");
+      tr.className = "border-t border-slate-100";
+      columns.forEach((col) => {
+        const td = document.createElement("td");
+        td.className = "px-3 py-2 text-xs text-slate-700";
+        const value = row[col] ?? "";
+        td.textContent = value;
+        td.title = String(value);
+        td.style.maxWidth = "260px";
+        td.style.whiteSpace = "nowrap";
+        td.style.overflow = "hidden";
+        td.style.textOverflow = "ellipsis";
+        tr.appendChild(td);
+      });
+      tableBody.appendChild(tr);
+    });
+  }
+
+  function renderCharts(charts) {
+    const time = charts.time_trend || { labels: [], values: [] };
+    const cat = charts.top_categories || { labels: [], values: [] };
+    const cust = charts.top_entities || { labels: [], values: [] };
+
+    timeChart.data.labels = time.labels;
+    timeChart.data.datasets[0].data = time.values;
+    timeChart.data.datasets[0].label = time.label || "Rows";
+    timeChart.update();
+
+    categoriesChart.data.labels = cat.labels;
+    categoriesChart.data.datasets[0].data = cat.values;
+    categoriesChart.data.datasets[0].label = cat.label || "Category";
+    categoriesChart.update();
+
+    customersChart.data.labels = cust.labels;
+    customersChart.data.datasets[0].data = cust.values;
+    customersChart.data.datasets[0].label = cust.label || "Entity";
+    customersChart.update();
+  }
+
+  async function loadFilterSchema() {
+    const response = await fetch("/api/data/filters");
+    const payload = await response.json();
+    schema = payload.filters || [];
+    renderFilters();
+  }
+
+  async function runQuery() {
+    queryStatus.textContent = "Loading...";
+    const filters = collectFilters();
+    const query = new URLSearchParams({
+      page: String(currentPage),
+      page_size: String(pageSize),
+      filters: JSON.stringify(filters)
+    });
+    const response = await fetch(`/api/data/query?${query.toString()}`);
+    const payload = await response.json();
+    totalRows = payload.total || 0;
+    renderTable(payload.columns || [], payload.rows || []);
+    renderCharts(payload.charts || {});
+    pageLabel.textContent = `Page ${payload.page} · ${totalRows} rows`;
+    queryStatus.textContent = "Updated";
+  }
+
+  applyButton.addEventListener("click", async () => {
+    currentPage = 1;
+    await runQuery();
+  });
+
+  resetButton.addEventListener("click", async () => {
+    filtersContainer.querySelectorAll("input, select").forEach((el) => {
+      if (el.tagName.toLowerCase() === "select") {
+        Array.from(el.options).forEach((option) => { option.selected = false; });
+      } else {
+        el.value = "";
+      }
+    });
+    currentPage = 1;
+    await runQuery();
+  });
+
+  prevPageBtn.addEventListener("click", async () => {
+    if (currentPage <= 1) return;
+    currentPage -= 1;
+    await runQuery();
+  });
+
+  nextPageBtn.addEventListener("click", async () => {
+    if (currentPage * pageSize >= totalRows) return;
+    currentPage += 1;
+    await runQuery();
+  });
+
+  (async function init() {
+    await loadFilterSchema();
+    await runQuery();
+  })();
+</script>
+{% endblock %}

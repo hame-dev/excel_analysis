@@ -1,0 +1,220 @@
+{% extends "ai_analysis/base.html" %}
+
+{% block title %}Runtime Settings{% endblock %}
+
+{% block content %}
+<section class="mx-auto max-w-4xl rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+  <div class="flex items-center justify-between">
+    <div>
+      <h2 class="text-lg font-semibold text-slate-900">Runtime Settings</h2>
+      <p class="mt-1 text-sm text-slate-600">Optional custom prompt and editable Ollama runtime config.</p>
+    </div>
+    <span class="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600">
+      {% if runtime_config.verified_at %}Verified{% else %}Not Verified{% endif %}
+    </span>
+  </div>
+
+  <div class="mt-6 flex gap-2 rounded-xl bg-slate-100 p-1">
+    <button id="tab-prompt-btn" type="button" class="tab-btn flex-1 rounded-lg px-3 py-2 text-sm font-semibold" data-tab="prompt">
+      Custom Prompt
+    </button>
+    <button id="tab-ollama-btn" type="button" class="tab-btn flex-1 rounded-lg px-3 py-2 text-sm font-semibold" data-tab="ollama">
+      Ollama
+    </button>
+  </div>
+
+  <div id="tab-prompt" class="tab-panel mt-5">
+    <label for="custom-prompt" class="mb-2 block text-sm font-medium text-slate-700">Custom prompt (optional)</label>
+    <textarea
+      id="custom-prompt"
+      rows="12"
+      class="w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:border-brand-500 focus:outline-none"
+      placeholder="Optional instructions injected into SQL + assistant prompts..."
+    >{{ runtime_config.custom_prompt }}</textarea>
+    <p class="mt-2 text-xs text-slate-500">Leave blank to use default prompt behavior only.</p>
+  </div>
+
+  <div id="tab-ollama" class="tab-panel mt-5 hidden space-y-4">
+    <div class="grid gap-4 md:grid-cols-2">
+      <div class="md:col-span-2">
+        <label for="ollama-base-url" class="mb-1 block text-sm font-medium text-slate-700">Ollama Base URL</label>
+        <input id="ollama-base-url" type="text" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="{{ runtime_config.ollama_base_url }}" />
+      </div>
+      <div>
+        <label for="ollama-qa-model" class="mb-1 block text-sm font-medium text-slate-700">QA Model</label>
+        <input id="ollama-qa-model" type="text" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="{{ runtime_config.ollama_qa_model }}" />
+      </div>
+      <div>
+        <label for="ollama-chat-model" class="mb-1 block text-sm font-medium text-slate-700">Chat Model</label>
+        <input id="ollama-chat-model" type="text" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="{{ runtime_config.ollama_chat_model }}" />
+      </div>
+      <div class="md:col-span-2">
+        <label for="ollama-embed-model" class="mb-1 block text-sm font-medium text-slate-700">Embedding Model</label>
+        <input id="ollama-embed-model" type="text" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm" value="{{ runtime_config.ollama_embed_model }}" />
+      </div>
+    </div>
+    <p class="text-xs text-slate-500">
+      Last verified:
+      <span id="verified-at-text">{% if runtime_config.verified_at %}{{ runtime_config.verified_at }}{% else %}Never{% endif %}</span>
+    </p>
+  </div>
+
+  <div class="mt-6 flex flex-wrap gap-3">
+    <button id="verify-btn" type="button" class="rounded-lg border border-brand-300 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 hover:bg-brand-100">
+      Verify Ollama API
+    </button>
+    <button id="save-btn" type="button" class="rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+      Save Settings
+    </button>
+    <span id="settings-status" class="self-center text-sm text-slate-600"></span>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const tabButtons = Array.from(document.querySelectorAll(".tab-btn"));
+  const tabPanels = {
+    prompt: document.getElementById("tab-prompt"),
+    ollama: document.getElementById("tab-ollama"),
+  };
+
+  const customPromptEl = document.getElementById("custom-prompt");
+  const baseUrlEl = document.getElementById("ollama-base-url");
+  const qaModelEl = document.getElementById("ollama-qa-model");
+  const chatModelEl = document.getElementById("ollama-chat-model");
+  const embedModelEl = document.getElementById("ollama-embed-model");
+  const verifyBtn = document.getElementById("verify-btn");
+  const saveBtn = document.getElementById("save-btn");
+  const statusEl = document.getElementById("settings-status");
+  const verifiedAtText = document.getElementById("verified-at-text");
+
+  const initialSignature = [
+    "{{ runtime_config.ollama_base_url|escapejs }}",
+    "{{ runtime_config.ollama_qa_model|escapejs }}",
+    "{{ runtime_config.ollama_chat_model|escapejs }}",
+    "{{ runtime_config.ollama_embed_model|escapejs }}",
+  ].join("||");
+  let verifiedSignature = {% if runtime_config.verified_at %}initialSignature{% else %}""{% endif %};
+
+  function setActiveTab(tab) {
+    tabButtons.forEach((btn) => {
+      const isActive = btn.dataset.tab === tab;
+      btn.classList.toggle("bg-white", isActive);
+      btn.classList.toggle("text-slate-900", isActive);
+      btn.classList.toggle("text-slate-600", !isActive);
+    });
+    Object.entries(tabPanels).forEach(([name, panel]) => {
+      panel.classList.toggle("hidden", name !== tab);
+    });
+  }
+
+  function ollamaSignature() {
+    return [
+      (baseUrlEl.value || "").trim(),
+      (qaModelEl.value || "").trim(),
+      (chatModelEl.value || "").trim(),
+      (embedModelEl.value || "").trim(),
+    ].join("||");
+  }
+
+  function payload() {
+    return {
+      custom_prompt: customPromptEl.value || "",
+      ollama_base_url: baseUrlEl.value || "",
+      ollama_qa_model: qaModelEl.value || "",
+      ollama_chat_model: chatModelEl.value || "",
+      ollama_embed_model: embedModelEl.value || "",
+    };
+  }
+
+  function setStatus(text, tone = "neutral") {
+    statusEl.textContent = text;
+    statusEl.className = "self-center text-sm";
+    if (tone === "success") statusEl.classList.add("text-emerald-700");
+    else if (tone === "error") statusEl.classList.add("text-rose-700");
+    else statusEl.classList.add("text-slate-600");
+  }
+
+  async function verifySettings() {
+    const currentPayload = payload();
+    const response = await fetch("/api/settings/verify", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": window.CSRF_TOKEN || "",
+      },
+      body: JSON.stringify(currentPayload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) {
+      verifiedSignature = "";
+      const missing = (data?.result?.missing_models || []).join(", ");
+      const suffix = missing ? ` Missing models: ${missing}` : "";
+      throw new Error((data?.result?.message || data.error || "Verification failed.") + suffix);
+    }
+    verifiedSignature = ollamaSignature();
+    return data.result;
+  }
+
+  async function saveSettings(markVerified) {
+    const currentPayload = payload();
+    currentPayload.mark_verified = !!markVerified;
+    const response = await fetch("/api/settings/save", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": window.CSRF_TOKEN || "",
+      },
+      body: JSON.stringify(currentPayload),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Save failed.");
+    return data;
+  }
+
+  verifyBtn.addEventListener("click", async () => {
+    verifyBtn.disabled = true;
+    setStatus("Verifying Ollama API and models...", "neutral");
+    try {
+      const result = await verifySettings();
+      setStatus(result.message || "Verification successful.", "success");
+    } catch (error) {
+      setStatus(error.message || "Verification failed.", "error");
+    } finally {
+      verifyBtn.disabled = false;
+    }
+  });
+
+  saveBtn.addEventListener("click", async () => {
+    const sig = ollamaSignature();
+    const ollamaChanged = sig !== initialSignature;
+    if (ollamaChanged && sig !== verifiedSignature) {
+      setStatus("Please verify Ollama settings first before saving.", "error");
+      return;
+    }
+    saveBtn.disabled = true;
+    setStatus("Saving settings...", "neutral");
+    try {
+      const data = await saveSettings(sig === verifiedSignature);
+      if (data?.config?.verified_at) verifiedAtText.textContent = data.config.verified_at;
+      setStatus("Settings saved.", "success");
+    } catch (error) {
+      setStatus(error.message || "Failed to save settings.", "error");
+    } finally {
+      saveBtn.disabled = false;
+    }
+  });
+
+  [baseUrlEl, qaModelEl, chatModelEl, embedModelEl].forEach((el) => {
+    el.addEventListener("input", () => {
+      if (verifiedSignature && ollamaSignature() !== verifiedSignature) {
+        setStatus("Ollama fields changed. Verify again before saving.", "neutral");
+      }
+    });
+  });
+
+  tabButtons.forEach((btn) => btn.addEventListener("click", () => setActiveTab(btn.dataset.tab)));
+  setActiveTab("prompt");
+</script>
+{% endblock %}

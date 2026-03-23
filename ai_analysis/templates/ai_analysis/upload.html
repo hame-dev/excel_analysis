@@ -1,0 +1,309 @@
+{% extends "ai_analysis/base.html" %}
+
+{% block title %}Upload Dataset{% endblock %}
+
+{% block content %}
+<div class="grid gap-6 lg:grid-cols-3">
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft lg:col-span-2">
+    <h2 class="text-lg font-semibold text-slate-900">Upload Dataset</h2>
+    <p class="mt-1 text-sm text-slate-600">
+      Upload one `.xlsx`, `.xls`, or `.csv` file. New uploads replace active data in SQLite/DataFrame/Chroma while keeping history metadata.
+    </p>
+
+    <form id="upload-form" class="mt-6 space-y-4">
+      {% csrf_token %}
+      <label class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center hover:border-brand-500 hover:bg-brand-50">
+        <input id="excel-file" name="excel_file" type="file" accept=".xlsx,.xls,.csv" class="hidden" />
+        <span class="text-sm font-medium text-slate-700">Choose `.xlsx`, `.xls`, or `.csv` file</span>
+        <span id="file-name" class="mt-2 text-xs text-slate-500">No file selected</span>
+      </label>
+
+      <button id="upload-button" type="submit" class="inline-flex items-center rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+        Upload and Rebuild
+      </button>
+      <span id="upload-status" class="ml-2 text-sm text-slate-600"></span>
+    </form>
+
+    <div id="processing-banner" class="mt-4 hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex h-2.5 w-2.5 animate-pulse rounded-full bg-amber-500"></span>
+        <span id="processing-text">Upload is processing...</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+    <h3 class="text-base font-semibold text-slate-900">Active Dataset</h3>
+    {% if active_upload %}
+      <dl class="mt-4 space-y-3 text-sm">
+        <div><dt class="font-medium text-slate-500">File</dt><dd class="text-slate-800">{{ active_upload.original_filename }}</dd></div>
+        <div><dt class="font-medium text-slate-500">Rows</dt><dd class="text-slate-800">{{ active_upload.row_count }}</dd></div>
+        <div><dt class="font-medium text-slate-500">Columns</dt><dd class="text-slate-800">{{ active_upload.column_count }}</dd></div>
+        <div><dt class="font-medium text-slate-500">Null Fill</dt><dd class="text-slate-800">{{ active_upload.null_strategy }}</dd></div>
+        <div><dt class="font-medium text-slate-500">Uploaded</dt><dd class="text-slate-800">{{ active_upload.uploaded_at }}</dd></div>
+      </dl>
+    {% else %}
+      <p class="mt-3 text-sm text-slate-600">No active dataset uploaded yet.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-soft">
+  <h3 class="text-base font-semibold text-slate-900">Upload History</h3>
+  <div class="mt-4 overflow-x-auto">
+    <table class="min-w-full text-left text-sm">
+      <thead class="bg-slate-50 text-slate-600">
+        <tr>
+          <th class="px-3 py-2">Filename</th>
+          <th class="px-3 py-2">Rows</th>
+          <th class="px-3 py-2">Columns</th>
+          <th class="px-3 py-2">Null Fill</th>
+          <th class="px-3 py-2">Status</th>
+          <th class="px-3 py-2">Uploaded At</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in upload_history %}
+          <tr class="border-t border-slate-100">
+            <td class="px-3 py-2 text-slate-800">{{ item.original_filename }}</td>
+            <td class="px-3 py-2">{{ item.row_count }}</td>
+            <td class="px-3 py-2">{{ item.column_count }}</td>
+            <td class="px-3 py-2">{{ item.null_strategy }}</td>
+            <td class="px-3 py-2">
+              {% if item.is_active %}
+                <span class="rounded bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-700">Active</span>
+              {% else %}
+                <span class="rounded bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="px-3 py-2">{{ item.uploaded_at }}</td>
+          </tr>
+        {% empty %}
+          <tr><td class="px-3 py-4 text-slate-500" colspan="6">No uploads yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div id="null-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/50 p-4">
+  <div class="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-soft">
+    <h3 class="text-lg font-semibold text-slate-900">Null Values Detected</h3>
+    <p class="mt-1 text-sm text-slate-600">Choose how to handle null values before importing this dataset.</p>
+
+    <div class="mt-4">
+      <label for="null-strategy" class="mb-1 block text-sm font-medium text-slate-700">Null handling strategy</label>
+      <select id="null-strategy" class="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
+        <option value="none">No fill (keep nulls)</option>
+        <option value="frontfill">Forward fill</option>
+        <option value="backfill">Backward fill</option>
+        <option value="back_forward_fill">Forward + backward fill</option>
+        <option value="mean_fill">Mean fill (numeric columns)</option>
+        <option value="zero_fill">Zero fill</option>
+      </select>
+    </div>
+
+    <div class="mt-4 overflow-x-auto">
+      <table class="min-w-full text-left text-xs">
+        <thead class="bg-slate-50 text-slate-600">
+          <tr>
+            <th class="px-2 py-2">Column</th>
+            <th class="px-2 py-2">Null Count</th>
+            <th class="px-2 py-2">Null Ratio</th>
+          </tr>
+        </thead>
+        <tbody id="null-summary-body"></tbody>
+      </table>
+    </div>
+
+    <div class="mt-5 flex justify-end gap-2">
+      <button id="null-cancel" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700">Cancel</button>
+      <button id="null-confirm" class="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white">Continue Upload</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const uploadForm = document.getElementById("upload-form");
+  const fileInput = document.getElementById("excel-file");
+  const fileName = document.getElementById("file-name");
+  const statusLabel = document.getElementById("upload-status");
+  const uploadButton = document.getElementById("upload-button");
+  const nullModal = document.getElementById("null-modal");
+  const nullSummaryBody = document.getElementById("null-summary-body");
+  const nullStrategySelect = document.getElementById("null-strategy");
+  const nullConfirm = document.getElementById("null-confirm");
+  const nullCancel = document.getElementById("null-cancel");
+  const processingBanner = document.getElementById("processing-banner");
+  const processingText = document.getElementById("processing-text");
+
+  let uploadLocked = false;
+
+  function setUploadLock(processing, detail = {}) {
+    uploadLocked = !!processing;
+    uploadButton.disabled = uploadLocked;
+    fileInput.disabled = uploadLocked;
+
+    if (uploadLocked) {
+      const filename = detail.filename || "";
+      const elapsed = Number(detail.elapsed_seconds || 0);
+      processingBanner.classList.remove("hidden");
+      processingText.textContent = filename
+        ? `Processing "${filename}"... (${elapsed}s)`
+        : `Processing upload... (${elapsed}s)`;
+      statusLabel.textContent = "Upload is currently locked until processing completes.";
+      statusLabel.className = "ml-2 text-sm text-amber-700";
+    } else {
+      processingBanner.classList.add("hidden");
+      if (!statusLabel.textContent.includes("Done:")) {
+        statusLabel.textContent = "";
+      }
+    }
+  }
+
+  async function refreshUploadStatus() {
+    try {
+      const response = await fetch("/api/upload/status");
+      const data = await response.json();
+      if (!response.ok || !data.ok) return;
+      setUploadLock(data.processing?.is_processing, data.processing || {});
+    } catch (_e) {
+      // Keep UI usable even if polling fails temporarily.
+    }
+  }
+
+  fileInput.addEventListener("change", () => {
+    fileName.textContent = fileInput.files[0] ? fileInput.files[0].name : "No file selected";
+  });
+
+  async function previewNulls(file) {
+    const formData = new FormData();
+    formData.append("excel_file", file);
+    const response = await fetch("/api/upload/preview-nulls", {
+      method: "POST",
+      body: formData,
+      headers: { "X-CSRFToken": window.CSRF_TOKEN || "" }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to inspect nulls.");
+    return data.preview;
+  }
+
+  function openNullModal(preview) {
+    nullSummaryBody.innerHTML = "";
+    (preview.columns || []).forEach((item) => {
+      const row = document.createElement("tr");
+      row.className = "border-t border-slate-100";
+      row.innerHTML = `
+        <td class="px-2 py-2">${item.column}</td>
+        <td class="px-2 py-2">${item.null_count}</td>
+        <td class="px-2 py-2">${(item.null_ratio * 100).toFixed(2)}%</td>
+      `;
+      nullSummaryBody.appendChild(row);
+    });
+    if (!preview.columns?.length) {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td class="px-2 py-3 text-slate-500" colspan="3">No nulls detected.</td>`;
+      nullSummaryBody.appendChild(row);
+    }
+
+    nullModal.classList.remove("hidden");
+    nullModal.classList.add("flex");
+
+    return new Promise((resolve, reject) => {
+      const onConfirm = () => {
+        cleanup();
+        resolve(nullStrategySelect.value || "none");
+      };
+      const onCancel = () => {
+        cleanup();
+        reject(new Error("Upload cancelled by user."));
+      };
+      const cleanup = () => {
+        nullConfirm.removeEventListener("click", onConfirm);
+        nullCancel.removeEventListener("click", onCancel);
+        nullModal.classList.add("hidden");
+        nullModal.classList.remove("flex");
+      };
+      nullConfirm.addEventListener("click", onConfirm);
+      nullCancel.addEventListener("click", onCancel);
+    });
+  }
+
+  async function uploadFile(file, nullStrategy) {
+    const formData = new FormData();
+    formData.append("excel_file", file);
+    formData.append("null_strategy", nullStrategy || "none");
+
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+      headers: { "X-CSRFToken": window.CSRF_TOKEN || "" }
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 409 && data.processing) {
+        setUploadLock(true, data.processing);
+      }
+      throw new Error(data.error || "Upload failed");
+    }
+    return data;
+  }
+
+  uploadForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (uploadLocked) {
+      statusLabel.textContent = "Another upload is in progress. Please wait.";
+      statusLabel.className = "ml-2 text-sm text-amber-700";
+      return;
+    }
+
+    const file = fileInput.files[0];
+    if (!file) {
+      statusLabel.textContent = "Please select a file first.";
+      statusLabel.className = "ml-2 text-sm text-rose-600";
+      return;
+    }
+
+    setUploadLock(true, {filename: file.name, elapsed_seconds: 0});
+    statusLabel.textContent = "Scanning file for null values...";
+    statusLabel.className = "ml-2 text-sm text-slate-600";
+
+    try {
+      const preview = await previewNulls(file);
+      let nullStrategy = "none";
+      if (preview.has_nulls) {
+        statusLabel.textContent = `Detected ${preview.total_nulls} null values. Choose strategy...`;
+        nullStrategy = await openNullModal(preview);
+      }
+
+      statusLabel.textContent = "Uploading and rebuilding indexes...";
+      const uploadResult = await uploadFile(file, nullStrategy);
+      statusLabel.textContent = `Done: ${uploadResult.upload.filename} (${uploadResult.upload.rows} rows) · null strategy: ${uploadResult.upload.null_strategy}`;
+      statusLabel.className = "ml-2 text-sm text-emerald-700";
+      setTimeout(() => window.location.reload(), 900);
+    } catch (error) {
+      if (error?.message && error.message.includes("already in progress")) {
+        await refreshUploadStatus();
+      }
+      statusLabel.textContent = error.message || "Upload failed";
+      statusLabel.className = "ml-2 text-sm text-rose-600";
+    } finally {
+      if (!statusLabel.textContent.startsWith("Done:")) {
+        setUploadLock(false);
+      }
+    }
+  });
+
+  (async function initUploadState() {
+    setUploadLock({{ upload_processing.is_processing|yesno:"true,false" }}, {
+      filename: "{{ upload_processing.filename|escapejs }}",
+      elapsed_seconds: {{ upload_processing.elapsed_seconds|default:0 }},
+    });
+    await refreshUploadStatus();
+    window.setInterval(refreshUploadStatus, 2000);
+  })();
+</script>
+{% endblock %}

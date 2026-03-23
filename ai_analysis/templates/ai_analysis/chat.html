@@ -1,0 +1,491 @@
+{% extends "ai_analysis/base.html" %}
+
+{% block title %}AI Chat{% endblock %}
+
+{% block content %}
+<div class="grid gap-4 lg:grid-cols-[320px_1fr]">
+  <aside class="flex min-h-[78vh] flex-col rounded-2xl border border-slate-200 bg-white/85 p-4 shadow-soft backdrop-blur">
+    <button id="new-chat-btn" type="button" class="w-full rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800">
+      + New Chat
+    </button>
+
+    <div id="chat-session-list" class="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
+      {% for session in chat_sessions %}
+        <a
+          href="/chat?session={{ session.id }}"
+          class="block rounded-xl border px-3 py-2 text-sm transition {% if selected_session_id == session.id %}border-slate-900 bg-slate-900 text-white{% else %}border-slate-200 bg-white text-slate-800 hover:bg-slate-50{% endif %}"
+          data-session-id="{{ session.id }}"
+        >
+          <p class="truncate font-medium">{{ session.title }}</p>
+          <p class="mt-1 truncate text-xs {% if selected_session_id == session.id %}text-slate-200{% else %}text-slate-500{% endif %}">
+            {% if session.last_message %}{{ session.last_message }}{% else %}No messages yet{% endif %}
+          </p>
+        </a>
+      {% empty %}
+        <div class="rounded-xl border border-slate-200 bg-slate-50 px-3 py-4 text-sm text-slate-500">
+          No chats yet. Start a new chat.
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="mt-4 space-y-2 text-sm">
+      <a href="/upload" class="block rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Upload New File</a>
+      <a href="/visualization" class="block rounded-lg border border-slate-200 px-3 py-2 hover:bg-slate-50">Open Visualization</a>
+    </div>
+  </aside>
+
+  <section class="relative min-h-[78vh] rounded-2xl border border-slate-200 bg-white/85 shadow-soft backdrop-blur">
+    <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
+      <h2 class="text-sm font-semibold text-slate-900">Chat</h2>
+      {% if active_upload %}
+        <span class="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
+          {{ active_upload.original_filename }}
+        </span>
+      {% else %}
+        <span class="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-xs font-medium text-rose-700">
+          No active dataset
+        </span>
+      {% endif %}
+    </div>
+    <div id="chat-log" class="h-[65vh] space-y-6 overflow-y-auto px-5 py-6">
+      {% for message in messages %}
+        <article data-role="{{ message.role }}" class="flex {% if message.role == 'user' %}justify-end{% else %}justify-start{% endif %}">
+          <div class="max-w-[85%] rounded-2xl px-4 py-3 {% if message.role == 'user' %}bg-slate-900 text-white{% else %}border border-slate-200 bg-slate-50 text-slate-900{% endif %}">
+            <div class="mb-1 flex items-center justify-between gap-3 text-[11px] uppercase tracking-wide {% if message.role == 'user' %}text-slate-200{% else %}text-slate-500{% endif %}">
+              <span>{{ message.role }}</span>
+            </div>
+            <div class="bubble-content whitespace-pre-wrap text-sm leading-6">{{ message.content }}</div>
+            <div class="bubble-attachments mt-3 space-y-2"></div>
+          </div>
+        </article>
+      {% empty %}
+        <p class="text-sm text-slate-500">No messages yet. Ask a question to start.</p>
+      {% endfor %}
+    </div>
+
+    <div class="border-t border-slate-200 bg-white/90 p-4">
+      <form id="chat-form" class="mx-auto flex max-w-4xl items-end gap-3">
+        {% csrf_token %}
+        <textarea id="chat-input" rows="1" class="max-h-52 min-h-[52px] w-full resize-y rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm leading-6 focus:border-brand-500 focus:outline-none" placeholder="Message AI Analysis..."></textarea>
+        <button id="send-button" type="submit" class="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50">
+          Send
+        </button>
+      </form>
+      <p class="mx-auto mt-2 max-w-4xl text-xs text-slate-500">Use SQL-style questions, pandas-style analysis requests, or ask for plots with matplotlib.</p>
+    </div>
+  </section>
+</div>
+
+<div id="trace-panel" class="fixed right-0 top-0 z-50 h-full w-full max-w-lg translate-x-full border-l border-slate-200 bg-white/95 p-4 shadow-2xl backdrop-blur transition-transform duration-300">
+  <div class="mb-3 flex items-center justify-between">
+    <div>
+      <h3 class="text-sm font-semibold text-slate-900">Tool Trace</h3>
+      <p class="text-xs text-slate-500">Live action/input/observation stream</p>
+    </div>
+    <button id="close-trace" type="button" class="rounded-lg border border-slate-300 px-2 py-1 text-xs hover:bg-slate-50">Close</button>
+  </div>
+  <div id="trace-log" class="h-[90%] space-y-3 overflow-y-auto pr-1"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.6/dist/purify.min.js"></script>
+<style>
+  .markdown-body p { margin: 0.35rem 0; }
+  .markdown-body h1, .markdown-body h2, .markdown-body h3 { margin: 0.5rem 0; font-weight: 700; }
+  .markdown-body ul, .markdown-body ol { margin: 0.35rem 0; padding-left: 1.2rem; }
+  .markdown-body code { background: rgba(15, 23, 42, 0.08); border-radius: 0.25rem; padding: 0.1rem 0.28rem; }
+  .markdown-body pre { background: #0f172a; color: #f8fafc; border-radius: 0.6rem; padding: 0.7rem; overflow-x: auto; }
+  .markdown-body pre code { background: transparent; padding: 0; }
+  .markdown-body table { width: 100%; border-collapse: collapse; margin: 0.4rem 0; }
+  .markdown-body th, .markdown-body td { border: 1px solid #e2e8f0; padding: 0.35rem 0.45rem; text-align: left; }
+</style>
+<script>
+  const chatForm = document.getElementById("chat-form");
+  const chatInput = document.getElementById("chat-input");
+  const chatLog = document.getElementById("chat-log");
+  const sendButton = document.getElementById("send-button");
+  const tracePanel = document.getElementById("trace-panel");
+  const traceLog = document.getElementById("trace-log");
+  const closeTraceBtn = document.getElementById("close-trace");
+  const newChatBtn = document.getElementById("new-chat-btn");
+  const chatSessionList = document.getElementById("chat-session-list");
+
+  let currentAssistantEl = null;
+  let currentAssistantAttachmentsEl = null;
+  let currentAssistantStatusEl = null;
+  let currentAssistantRaw = "";
+  let streamCompleted = false;
+  let currentSessionId = {{ selected_session_id|default_if_none:"null" }};
+  const traceStepMap = new Map();
+  const currentPlotUrls = new Set();
+
+  function scrollToBottom(container) {
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function setTraceOpen(open) {
+    if (open) {
+      tracePanel.classList.remove("translate-x-full");
+    } else {
+      tracePanel.classList.add("translate-x-full");
+    }
+    updateTraceToggleButtons();
+  }
+
+  closeTraceBtn.addEventListener("click", () => setTraceOpen(false));
+
+  function isTracePanelOpen() {
+    return !tracePanel.classList.contains("translate-x-full");
+  }
+
+  function updateTraceToggleButtons() {
+    const label = isTracePanelOpen() ? "hide tool execution" : "view tool execution";
+    document.querySelectorAll('[data-open-trace="1"]').forEach((el) => {
+      el.textContent = label;
+    });
+  }
+
+  function escapeHtml(text) {
+    return (text || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;");
+  }
+
+  function renderMarkdown(text) {
+    const raw = text || "";
+    if (window.marked) {
+      window.marked.setOptions({ gfm: true, breaks: true });
+      const html = window.marked.parse(raw);
+      if (window.DOMPurify) return window.DOMPurify.sanitize(html);
+      return html;
+    }
+    return escapeHtml(raw).replace(/\n/g, "<br>");
+  }
+
+  function renderAssistantMarkdown(contentEl, text) {
+    contentEl.classList.remove("whitespace-pre-wrap");
+    contentEl.innerHTML = `<div class="markdown-body">${renderMarkdown(text)}</div>`;
+  }
+
+  function createBubble(role, text = "") {
+    const container = document.createElement("article");
+    container.dataset.role = role;
+    container.className = `flex ${role === "user" ? "justify-end" : "justify-start"}`;
+    const bubble = document.createElement("div");
+    bubble.className = `max-w-[85%] rounded-2xl px-4 py-3 ${role === "user" ? "bg-slate-900 text-white" : "border border-slate-200 bg-slate-50 text-slate-900"}`;
+    bubble.innerHTML = `
+      <div class="mb-1 text-[11px] uppercase tracking-wide ${role === "user" ? "text-slate-200" : "text-slate-500"}">${role}</div>
+      <div class="bubble-content whitespace-pre-wrap text-sm leading-6"></div>
+      <div class="assistant-status mt-2 hidden rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-[11px] text-brand-700"></div>
+      <div class="bubble-attachments mt-3 space-y-2"></div>
+    `;
+    bubble.querySelector(".bubble-content").textContent = text;
+    container.appendChild(bubble);
+    chatLog.appendChild(container);
+    scrollToBottom(chatLog);
+    return {
+      container,
+      content: bubble.querySelector(".bubble-content"),
+      status: bubble.querySelector(".assistant-status"),
+      attachments: bubble.querySelector(".bubble-attachments"),
+    };
+  }
+
+  function decodeHtmlEntities(value) {
+    const parser = document.createElement("textarea");
+    parser.innerHTML = value || "";
+    return parser.value;
+  }
+
+  function extractPlotUrl(text) {
+    if (!text) return "";
+    const match =
+      text.match(/plot_url\s*=\s*(\S+)/i) ||
+      text.match(/<plot_image>\s*<url>(.*?)<\/url>/is) ||
+      text.match(/<url>(.*?)<\/url>/is);
+    if (!match || !match[1]) return "";
+    return decodeHtmlEntities(match[1].trim());
+  }
+
+  function setAssistantStatus(text, type = "running") {
+    if (!currentAssistantStatusEl) return;
+    currentAssistantStatusEl.classList.remove("hidden", "border-brand-200", "bg-brand-50", "text-brand-700", "border-rose-200", "bg-rose-50", "text-rose-700", "border-emerald-200", "bg-emerald-50", "text-emerald-700");
+    if (type === "error") currentAssistantStatusEl.classList.add("border-rose-200", "bg-rose-50", "text-rose-700");
+    else if (type === "done") currentAssistantStatusEl.classList.add("border-emerald-200", "bg-emerald-50", "text-emerald-700");
+    else currentAssistantStatusEl.classList.add("border-brand-200", "bg-brand-50", "text-brand-700");
+    currentAssistantStatusEl.innerHTML = `${escapeHtml(text)} <button type="button" class="ml-2 underline" data-open-trace="1">view tool execution</button>`;
+    updateTraceToggleButtons();
+  }
+
+  function renderPlotAttachments() {
+    if (!currentAssistantAttachmentsEl) return;
+    const urls = Array.from(currentPlotUrls);
+    if (!urls.length) {
+      currentAssistantAttachmentsEl.innerHTML = "";
+      return;
+    }
+    currentAssistantAttachmentsEl.innerHTML = urls
+      .map((url) => `<img src="${url}" class="w-full rounded-xl border border-slate-200 bg-white" alt="Generated plot" />`)
+      .join("");
+  }
+
+  function upsertTraceStep(payload) {
+    const stepKey = String(payload.step ?? "0");
+    let record = traceStepMap.get(stepKey);
+
+    if (!record) {
+      const card = document.createElement("div");
+      card.className = "rounded-xl border border-slate-200 bg-slate-50 p-3";
+      card.innerHTML = `
+        <details class="trace-details" open>
+          <summary class="flex cursor-pointer list-none items-center justify-between">
+            <div class="text-xs font-semibold text-slate-800">Step <span class="trace-step"></span> · <span class="trace-tool"></span></div>
+            <span class="trace-status rounded-full px-2 py-0.5 text-[10px] font-semibold"></span>
+          </summary>
+          <div class="mt-2 space-y-2">
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Action</div>
+              <pre class="trace-action mt-1 max-h-16 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-slate-700"></pre>
+            </div>
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Input</div>
+              <pre class="trace-input mt-1 max-h-28 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-slate-700"></pre>
+            </div>
+            <div>
+              <div class="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Observation</div>
+              <pre class="trace-observation mt-1 max-h-44 overflow-auto whitespace-pre-wrap rounded-lg bg-white p-2 text-[11px] text-slate-700"></pre>
+              <div class="trace-plot mt-2 hidden">
+                <img class="trace-plot-img w-full rounded-lg border border-slate-200 bg-white" alt="Generated plot" />
+              </div>
+            </div>
+          </div>
+        </details>
+      `;
+      traceLog.appendChild(card);
+      record = {card};
+      traceStepMap.set(stepKey, record);
+    }
+
+    const statusEl = record.card.querySelector(".trace-status");
+    const stepEl = record.card.querySelector(".trace-step");
+    const toolEl = record.card.querySelector(".trace-tool");
+    const actionEl = record.card.querySelector(".trace-action");
+    const inputEl = record.card.querySelector(".trace-input");
+    const observationEl = record.card.querySelector(".trace-observation");
+    const plotWrapEl = record.card.querySelector(".trace-plot");
+    const plotImgEl = record.card.querySelector(".trace-plot-img");
+
+    const actionText = String(payload.action || payload.tool || "unknown");
+    const inputText = String(payload.input ?? "").trim() || "(No input payload)";
+    let observationText = String(payload.observation ?? "").trim();
+    if (!observationText && payload.status === "running") observationText = "Waiting for observation...";
+    if (!observationText && payload.status === "completed") observationText = "No observation returned.";
+    if (!observationText && payload.status === "error") observationText = "Tool execution error.";
+
+    stepEl.textContent = payload.step ?? "";
+    toolEl.textContent = payload.tool ?? "unknown";
+    actionEl.textContent = actionText;
+    inputEl.textContent = inputText;
+    observationEl.textContent = observationText;
+    statusEl.textContent = payload.status ?? "running";
+
+    statusEl.className = "trace-status rounded-full px-2 py-0.5 text-[10px] font-semibold";
+    if (payload.status === "completed") statusEl.classList.add("bg-emerald-100", "text-emerald-700");
+    else if (payload.status === "error") statusEl.classList.add("bg-rose-100", "text-rose-700");
+    else statusEl.classList.add("bg-amber-100", "text-amber-700");
+
+    const plotUrl = extractPlotUrl(payload.observation ?? "");
+    if (plotUrl) {
+      plotImgEl.src = plotUrl;
+      plotWrapEl.classList.remove("hidden");
+      currentPlotUrls.add(plotUrl);
+    } else {
+      plotImgEl.removeAttribute("src");
+      plotWrapEl.classList.add("hidden");
+    }
+
+    if (payload.status === "running") setAssistantStatus(`Using ${payload.tool || "tool"}...`, "running");
+    else if (payload.status === "completed") setAssistantStatus(`Finished ${payload.tool || "tool"} step.`, "running");
+    else if (payload.status === "error") setAssistantStatus(`Tool error in ${payload.tool || "step"}.`, "error");
+
+    renderPlotAttachments();
+    scrollToBottom(traceLog);
+  }
+
+  function prependSessionLink(session) {
+    if (!chatSessionList || !session || !session.id) return;
+    const existing = chatSessionList.querySelector(`[data-session-id="${session.id}"]`);
+    if (existing) return;
+    const empty = chatSessionList.querySelector("div.rounded-xl.border");
+    if (empty && empty.textContent.includes("No chats yet")) empty.remove();
+
+    const link = document.createElement("a");
+    link.href = `/chat?session=${session.id}`;
+    link.dataset.sessionId = String(session.id);
+    link.className = "block rounded-xl border px-3 py-2 text-sm transition border-slate-900 bg-slate-900 text-white";
+    link.innerHTML = `
+      <p class="truncate font-medium">${escapeHtml(session.title || "New Chat")}</p>
+      <p class="mt-1 truncate text-xs text-slate-200">${escapeHtml(session.last_message || "No messages yet")}</p>
+    `;
+    chatSessionList.prepend(link);
+  }
+
+  async function createChatSession() {
+    const response = await fetch("/api/chat/sessions", {
+      method: "POST",
+      headers: { "X-CSRFToken": window.CSRF_TOKEN || "" }
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Failed to create chat session.");
+    return data;
+  }
+
+  async function ensureSession() {
+    if (currentSessionId) return currentSessionId;
+    const payload = await createChatSession();
+    const session = payload.session || {};
+    currentSessionId = session.id || null;
+    if (currentSessionId) {
+      window.history.replaceState({}, "", `/chat?session=${currentSessionId}`);
+      prependSessionLink(session);
+    }
+    return currentSessionId;
+  }
+
+  async function sendMessage(text) {
+    const sessionId = await ensureSession();
+    const response = await fetch("/api/chat/messages", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": window.CSRF_TOKEN || ""
+      },
+      body: JSON.stringify({message: text, session_id: sessionId})
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Failed to send message.");
+    if (data.session_id && !currentSessionId) {
+      currentSessionId = data.session_id;
+      window.history.replaceState({}, "", `/chat?session=${currentSessionId}`);
+    }
+    return data;
+  }
+
+  function openStream(streamUrl) {
+    const source = new EventSource(streamUrl);
+    streamCompleted = false;
+
+    source.addEventListener("trace", (event) => {
+      upsertTraceStep(JSON.parse(event.data));
+    });
+
+    source.addEventListener("token", (event) => {
+      const payload = JSON.parse(event.data);
+      currentAssistantRaw += payload.text || "";
+      if (currentAssistantEl) currentAssistantEl.textContent = currentAssistantRaw;
+      scrollToBottom(chatLog);
+    });
+
+    source.addEventListener("final", (event) => {
+      const payload = JSON.parse(event.data);
+      const finalAnswer = payload.answer || currentAssistantRaw;
+      currentAssistantRaw = finalAnswer;
+      if (currentAssistantEl) renderAssistantMarkdown(currentAssistantEl, finalAnswer);
+      setAssistantStatus("Response complete.", "done");
+      renderPlotAttachments();
+      scrollToBottom(chatLog);
+    });
+
+    source.addEventListener("error", (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (currentAssistantEl) currentAssistantEl.textContent = `Error: ${payload.message || "stream failed"}`;
+        setAssistantStatus(payload.message || "stream failed", "error");
+      } catch (_e) {
+        if (currentAssistantEl) currentAssistantEl.textContent = "Error: stream failed";
+        setAssistantStatus("stream failed", "error");
+      }
+      streamCompleted = true;
+      source.close();
+      sendButton.disabled = false;
+    });
+
+    source.addEventListener("done", () => {
+      streamCompleted = true;
+      source.close();
+      sendButton.disabled = false;
+      currentAssistantEl = null;
+      currentAssistantAttachmentsEl = null;
+      currentAssistantStatusEl = null;
+      currentAssistantRaw = "";
+      currentPlotUrls.clear();
+    });
+
+    source.onerror = () => {
+      if (streamCompleted) return;
+      setAssistantStatus("Connection interrupted.", "error");
+    };
+  }
+
+  chatForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = chatInput.value.trim();
+    if (!text) return;
+
+    createBubble("user", text);
+    chatInput.value = "";
+    traceStepMap.clear();
+    traceLog.innerHTML = "";
+    const placeholder = chatLog.querySelector("p.text-sm.text-slate-500");
+    if (placeholder) placeholder.remove();
+
+    const assistantBubble = createBubble("assistant", "");
+    currentAssistantEl = assistantBubble.content;
+    currentAssistantAttachmentsEl = assistantBubble.attachments;
+    currentAssistantStatusEl = assistantBubble.status;
+    currentAssistantRaw = "";
+    currentPlotUrls.clear();
+    setAssistantStatus("Thinking and planning tools...", "running");
+    sendButton.disabled = true;
+
+    try {
+      const payload = await sendMessage(text);
+      openStream(payload.stream_url);
+    } catch (error) {
+      if (currentAssistantEl) currentAssistantEl.textContent = `Error: ${error.message}`;
+      sendButton.disabled = false;
+    }
+  });
+
+  newChatBtn?.addEventListener("click", async () => {
+    try {
+      const payload = await createChatSession();
+      if (payload.chat_url) {
+        window.location.href = payload.chat_url;
+        return;
+      }
+      if (payload.session?.id) {
+        window.location.href = `/chat?session=${payload.session.id}`;
+      }
+    } catch (_e) {
+      // keep current chat if creation fails
+    }
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (target instanceof HTMLElement && target.dataset.openTrace === "1") {
+      setTraceOpen(!isTracePanelOpen());
+    }
+  });
+
+  document.querySelectorAll('article[data-role="assistant"] .bubble-content').forEach((el) => {
+    const raw = el.textContent || "";
+    renderAssistantMarkdown(el, raw);
+  });
+  updateTraceToggleButtons();
+</script>
+{% endblock %}
