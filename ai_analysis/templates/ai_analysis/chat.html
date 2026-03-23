@@ -40,26 +40,41 @@
       <button id="sidebar-collapse" type="button" class="rounded-lg p-2 text-stone-400 hover:bg-white/10 hover:text-white" title="Close sidebar">
         <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"/></svg>
       </button>
-      <button id="new-chat-btn" type="button" class="rounded-lg p-2 text-stone-400 hover:bg-white/10 hover:text-white" title="New chat">
-        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
-      </button>
+      <div class="flex items-center gap-1">
+        <button id="clear-history-btn" type="button" class="rounded-lg p-2 text-stone-400 hover:bg-white/10 hover:text-white" title="Delete all chat history">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673A2.25 2.25 0 0115.916 21H8.084a2.25 2.25 0 01-2.244-2.327L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0V4.5A2.25 2.25 0 0013.5 2.25h-3A2.25 2.25 0 008.25 4.5v.893m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+        </button>
+        <button id="new-chat-btn" type="button" class="rounded-lg p-2 text-stone-400 hover:bg-white/10 hover:text-white" title="New chat">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10"/></svg>
+        </button>
+      </div>
     </div>
 
     {# Session list #}
     <div id="chat-session-list" class="mt-1 flex-1 space-y-0.5 overflow-y-auto px-2 py-2 scrollbar-thin">
       {% for session in chat_sessions %}
-        <a
-          href="/chat?session={{ session.id }}"
-          class="group block rounded-xl px-3 py-2.5 text-sm transition-all {% if selected_session_id == session.id %}bg-white/15 text-white{% else %}text-slate-400 hover:bg-white/10 hover:text-slate-200{% endif %}"
-          data-session-id="{{ session.id }}"
-        >
-          <p class="truncate font-medium">{{ session.title }}</p>
-          <p class="mt-0.5 truncate text-xs {% if selected_session_id == session.id %}text-slate-400{% else %}text-slate-500 group-hover:text-slate-400{% endif %}">
-            {% if session.last_message %}{{ session.last_message }}{% else %}No messages yet{% endif %}
-          </p>
-        </a>
+        <div class="group relative" data-session-item-id="{{ session.id }}">
+          <a
+            href="/chat?session={{ session.id }}"
+            class="block rounded-xl px-3 py-2.5 pr-9 text-sm transition-all {% if selected_session_id == session.id %}bg-white/15 text-white{% else %}text-slate-400 hover:bg-white/10 hover:text-slate-200{% endif %}"
+            data-session-id="{{ session.id }}"
+          >
+            <p class="truncate font-medium">{{ session.title }}</p>
+            <p class="mt-0.5 truncate text-xs {% if selected_session_id == session.id %}text-slate-400{% else %}text-slate-500 group-hover:text-slate-400{% endif %}">
+              {% if session.last_message %}{{ session.last_message }}{% else %}No messages yet{% endif %}
+            </p>
+          </a>
+          <button
+            type="button"
+            class="absolute right-1.5 top-1.5 hidden rounded-md p-1 text-slate-500 hover:bg-white/10 hover:text-slate-200 group-hover:inline-flex"
+            data-delete-session-id="{{ session.id }}"
+            title="Delete chat"
+          >
+            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673A2.25 2.25 0 0115.916 21H8.084a2.25 2.25 0 01-2.244-2.327L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0V4.5A2.25 2.25 0 0013.5 2.25h-3A2.25 2.25 0 008.25 4.5v.893m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+          </button>
+        </div>
       {% empty %}
-        <div class="rounded-xl border border-transparent px-3 py-4 text-sm text-slate-500 text-center">
+        <div class="rounded-xl border border-transparent px-3 py-4 text-sm text-slate-500 text-center" data-empty-sessions="1">
           No chats yet
         </div>
       {% endfor %}
@@ -222,6 +237,7 @@
   const traceLog = document.getElementById("trace-log");
   const closeTraceBtn = document.getElementById("close-trace");
   const newChatBtn = document.getElementById("new-chat-btn");
+  const clearHistoryBtn = document.getElementById("clear-history-btn");
   const chatSessionList = document.getElementById("chat-session-list");
   const appHeader = document.querySelector("body > header");
 
@@ -464,18 +480,53 @@
     if (!chatSessionList || !session || !session.id) return;
     const existing = chatSessionList.querySelector(`[data-session-id="${session.id}"]`);
     if (existing) return;
-    const empty = chatSessionList.querySelector("div.rounded-xl.border");
-    if (empty && empty.textContent.includes("No chats yet")) empty.remove();
+    chatSessionList.querySelector('[data-empty-sessions="1"]')?.remove();
 
-    const link = document.createElement("a");
-    link.href = `/chat?session=${session.id}`;
-    link.dataset.sessionId = String(session.id);
-    link.className = "group block rounded-xl px-3 py-2.5 text-sm transition-all bg-white/15 text-white";
-    link.innerHTML = `
-      <p class="truncate font-medium">${escapeHtml(session.title || "New Chat")}</p>
-      <p class="mt-0.5 truncate text-xs text-stone-400">${escapeHtml(session.last_message || "No messages yet")}</p>
+    const item = document.createElement("div");
+    item.className = "group relative";
+    item.dataset.sessionItemId = String(session.id);
+    item.innerHTML = `
+      <a href="/chat?session=${session.id}" class="block rounded-xl bg-white/15 px-3 py-2.5 pr-9 text-sm text-white transition-all" data-session-id="${session.id}">
+        <p class="truncate font-medium">${escapeHtml(session.title || "New Chat")}</p>
+        <p class="mt-0.5 truncate text-xs text-stone-400">${escapeHtml(session.last_message || "No messages yet")}</p>
+      </a>
+      <button type="button" class="absolute right-1.5 top-1.5 hidden rounded-md p-1 text-slate-500 hover:bg-white/10 hover:text-slate-200 group-hover:inline-flex" data-delete-session-id="${session.id}" title="Delete chat">
+        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.7"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673A2.25 2.25 0 0115.916 21H8.084a2.25 2.25 0 01-2.244-2.327L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0V4.5A2.25 2.25 0 0013.5 2.25h-3A2.25 2.25 0 008.25 4.5v.893m7.5 0a48.667 48.667 0 00-7.5 0"/></svg>
+      </button>
     `;
-    chatSessionList.prepend(link);
+    chatSessionList.prepend(item);
+  }
+
+  function ensureSessionEmptyState() {
+    if (!chatSessionList) return;
+    if (chatSessionList.querySelector('[data-session-item-id]')) return;
+    if (chatSessionList.querySelector('[data-empty-sessions="1"]')) return;
+
+    const empty = document.createElement("div");
+    empty.className = "rounded-xl border border-transparent px-3 py-4 text-sm text-slate-500 text-center";
+    empty.dataset.emptySessions = "1";
+    empty.textContent = "No chats yet";
+    chatSessionList.appendChild(empty);
+  }
+
+  async function deleteChatSession(sessionId) {
+    const response = await fetch(`/api/chat/sessions/${sessionId}/delete`, {
+      method: "POST",
+      headers: { "X-CSRFToken": window.CSRF_TOKEN || "" },
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Failed to delete chat.");
+    return data;
+  }
+
+  async function clearAllChatHistory() {
+    const response = await fetch("/api/chat/sessions/clear", {
+      method: "POST",
+      headers: { "X-CSRFToken": window.CSRF_TOKEN || "" },
+    });
+    const data = await response.json();
+    if (!response.ok || !data.ok) throw new Error(data.error || "Failed to clear chat history.");
+    return data;
   }
 
   async function createChatSession() {
@@ -621,10 +672,46 @@
     }
   });
 
-  document.addEventListener("click", (event) => {
+  clearHistoryBtn?.addEventListener("click", async () => {
+    if (!confirm("Delete all chat history? This cannot be undone.")) return;
+    try {
+      const payload = await clearAllChatHistory();
+      window.location.href = payload.chat_url || "/chat";
+    } catch (_e) {
+      // keep current chat if deletion fails
+    }
+  });
+
+  document.addEventListener("click", async (event) => {
     const target = event.target;
-    if (target instanceof HTMLElement && target.dataset.openTrace === "1") {
+    if (!(target instanceof Element)) return;
+
+    const traceToggle = target.closest('[data-open-trace="1"]');
+    if (traceToggle instanceof HTMLElement) {
       setTraceOpen(!isTracePanelOpen());
+      return;
+    }
+
+    const deleteBtn = target.closest("[data-delete-session-id]");
+    if (deleteBtn instanceof HTMLElement) {
+      event.preventDefault();
+      event.stopPropagation();
+      const sessionId = Number(deleteBtn.dataset.deleteSessionId || "");
+      if (!Number.isFinite(sessionId) || sessionId <= 0) return;
+      if (!confirm("Delete this chat? This cannot be undone.")) return;
+      try {
+        const payload = await deleteChatSession(sessionId);
+        const isCurrent = Number(currentSessionId || 0) === sessionId;
+        if (isCurrent) {
+          window.location.href = payload.chat_url || "/chat";
+          return;
+        }
+        const sessionItem = chatSessionList?.querySelector(`[data-session-item-id="${sessionId}"]`);
+        sessionItem?.remove();
+        ensureSessionEmptyState();
+      } catch (_e) {
+        // keep current chat if deletion fails
+      }
     }
   });
 

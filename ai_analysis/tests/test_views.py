@@ -139,6 +139,79 @@ def test_api_chat_sessions_creates_session(client) -> None:
 
 
 @pytest.mark.django_db
+def test_api_chat_session_delete_removes_session_messages_and_traces(client) -> None:
+    session_to_delete = ChatSession.objects.create(title="Delete Me")
+    keep_session = ChatSession.objects.create(title="Keep Me")
+
+    user_message = ChatMessage.objects.create(
+        role=ChatMessage.ROLE_USER,
+        session=session_to_delete,
+        content="hello",
+        status=ChatMessage.STATUS_DONE,
+    )
+    assistant_message = ChatMessage.objects.create(
+        role=ChatMessage.ROLE_ASSISTANT,
+        session=session_to_delete,
+        content="world",
+        status=ChatMessage.STATUS_DONE,
+    )
+    AgentTraceEvent.objects.create(
+        message=assistant_message,
+        step_index=1,
+        payload={"step": 1, "tool": "run_sql", "status": "completed"},
+    )
+
+    response = client.post(f"/api/chat/sessions/{session_to_delete.id}/delete")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["deleted_session_id"] == session_to_delete.id
+    assert payload["next_session_id"] == keep_session.id
+    assert payload["chat_url"] == f"/chat?session={keep_session.id}"
+
+    assert not ChatSession.objects.filter(id=session_to_delete.id).exists()
+    assert not ChatMessage.objects.filter(id=user_message.id).exists()
+    assert not ChatMessage.objects.filter(id=assistant_message.id).exists()
+    assert AgentTraceEvent.objects.count() == 0
+    assert ChatSession.objects.filter(id=keep_session.id).exists()
+
+
+@pytest.mark.django_db
+def test_api_chat_sessions_clear_removes_all_history(client) -> None:
+    session_one = ChatSession.objects.create(title="Chat One")
+    session_two = ChatSession.objects.create(title="Chat Two")
+
+    assistant_one = ChatMessage.objects.create(
+        role=ChatMessage.ROLE_ASSISTANT,
+        session=session_one,
+        content="one",
+        status=ChatMessage.STATUS_DONE,
+    )
+    ChatMessage.objects.create(
+        role=ChatMessage.ROLE_USER,
+        session=session_two,
+        content="two",
+        status=ChatMessage.STATUS_DONE,
+    )
+    AgentTraceEvent.objects.create(
+        message=assistant_one,
+        step_index=1,
+        payload={"step": 1, "tool": "run_sql", "status": "completed"},
+    )
+
+    response = client.post("/api/chat/sessions/clear")
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["ok"] is True
+    assert payload["deleted_sessions"] == 2
+    assert payload["chat_url"] == "/chat"
+
+    assert ChatSession.objects.count() == 0
+    assert ChatMessage.objects.count() == 0
+    assert AgentTraceEvent.objects.count() == 0
+
+
+@pytest.mark.django_db
 def test_api_chat_messages_uses_provided_session_id(client, monkeypatch: pytest.MonkeyPatch) -> None:
     upload = UploadRecord.objects.create(
         original_filename="active.xlsx",

@@ -308,6 +308,40 @@ def api_chat_sessions(request: HttpRequest) -> JsonResponse:
 
 
 @require_POST
+def api_chat_session_delete(request: HttpRequest, session_id: int) -> JsonResponse:
+    session = _resolve_chat_session(session_id)
+    if session is None:
+        return JsonResponse({"error": "Chat session not found."}, status=404)
+
+    deleted_session_id = session.id
+    session.delete()
+
+    next_session = ChatSession.objects.order_by("-updated_at", "-id").first()
+    chat_url = f"/chat?session={next_session.id}" if next_session else "/chat"
+    return JsonResponse(
+        {
+            "ok": True,
+            "deleted_session_id": deleted_session_id,
+            "next_session_id": next_session.id if next_session else None,
+            "chat_url": chat_url,
+        }
+    )
+
+
+@require_POST
+def api_chat_sessions_clear(request: HttpRequest) -> JsonResponse:
+    deleted_sessions = ChatSession.objects.count()
+    ChatSession.objects.all().delete()
+    return JsonResponse(
+        {
+            "ok": True,
+            "deleted_sessions": deleted_sessions,
+            "chat_url": "/chat",
+        }
+    )
+
+
+@require_POST
 def api_chat_messages(request: HttpRequest) -> JsonResponse:
     active_upload = _active_upload()
     if active_upload is None:
